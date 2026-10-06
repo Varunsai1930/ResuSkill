@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm; }
+  :root { --ink: #1a1a1a; --muted: #555; --rule: #c9c9c9; --accent: #1f3a5f; }
+  * { box-sizing: border-box; }
+  html { background: #f2f2f2; }
+  body {
+    margin: 0 auto; max-width: 210mm; min-height: 297mm; padding: 14mm 15mm;
+    background: #fff; color: var(--ink);
+    font: 10.5pt/1.38 "Helvetica Neue", Arial, "Segoe UI", sans-serif;
+  }
+  header { text-align: center; margin-bottom: 8pt; }
+  h1 { font-size: 19pt; margin: 0 0 3pt; letter-spacing: .3pt; color: var(--accent); }
+  .contact { color: var(--muted); font-size: 9.5pt; }
+  .contact span + span::before { content: " \2022 "; color: var(--rule); }
+  .contact a { color: inherit; text-decoration: none; }
+  section { margin-top: 9pt; }
+  h2 {
+    font-size: 10.5pt; text-transform: uppercase; letter-spacing: 1pt; color: var(--accent);
+    border-bottom: 1px solid var(--rule); padding-bottom: 2pt; margin: 0 0 5pt;
+    break-after: avoid; page-break-after: avoid;
+  }
+  .entry { margin-bottom: 6pt; break-inside: avoid; page-break-inside: avoid; }
+  .row { display: flex; justify-content: space-between; gap: 12pt; align-items: baseline; }
+  .row .what { font-weight: 600; }
+  .row .when { color: var(--muted); white-space: nowrap; font-size: 9.5pt; }
+  .sub { color: var(--muted); font-size: 9.5pt; }
+  ul { margin: 2pt 0 0; padding-left: 14pt; }
+  li { margin: 1pt 0; }
+  .skills p { margin: 1pt 0; }
+  .skills b { font-weight: 600; }
+  p.summary { margin: 0; }
+  @media print {
+    html { background: #fff; }
+    body { margin: 0; padding: 0; max-width: none; min-height: 0; }
+  }
+</style>
+</head>
+<body>
+$body
+</body>
+</html>
