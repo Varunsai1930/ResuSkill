@@ -12,6 +12,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import time
 from html import escape
 from pathlib import Path
 from string import Template
@@ -61,9 +62,10 @@ def _row(what: str, when: str) -> str:
 
 def resume_body(prof: dict, resume: dict) -> str:
     contact = prof["contact"]
-    bits = [f"<span>{_e(contact.get(k))}</span>" for k in ("location", "phone") if contact.get(k)]
+    bits = []
     if contact.get("email"):
-        bits.insert(0, f'<span><a href="mailto:{_e(contact["email"])}">{_e(contact["email"])}</a></span>')
+        bits.append(f'<span><a href="mailto:{_e(contact["email"])}">{_e(contact["email"])}</a></span>')
+    bits += [f"<span>{_e(contact.get(k))}</span>" for k in ("phone", "location") if contact.get(k)]
     bits += [f"<span>{_link(url)}</span>" for url in (contact.get("links") or {}).values() if url]
     html = [f'<header><h1>{_e(contact["name"])}</h1><div class="contact">{"".join(bits)}</div></header>']
 
@@ -273,16 +275,33 @@ def print_pdf(html_path: Path, pdf_path: Path) -> Path:
             "No Chrome, Chromium or Edge found for PDF output. Open the HTML file in a browser and use "
             "Print → Save as PDF, or set RESUSKILL_BROWSER to a Chromium-based browser."
         )
+    if pdf_path.exists():
+        pdf_path.unlink()
     with tempfile.TemporaryDirectory(prefix="resuskill-browser-") as profile_dir:
         cmd = [
             browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+            "--disable-extensions", "--disable-background-networking", "--disable-component-update",
             "--no-pdf-header-footer", f"--user-data-dir={profile_dir}",
             f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri(),
         ]
-        try:
-            subprocess.run(cmd, capture_output=True, timeout=90, check=False)
-        except subprocess.TimeoutExpired as exc:
-            raise ResuError("PDF printing timed out; use the browser's Save as PDF instead") from exc
+        # Output is discarded rather than captured: browser helper processes can keep
+        # inherited pipes open long after the PDF is written.
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        deadline, last_size = time.monotonic() + 90, -1
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                break
+            size = pdf_path.stat().st_size if pdf_path.exists() else 0
+            if size and size == last_size:
+                break
+            last_size = size
+            time.sleep(0.5)
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
     if not pdf_path.exists() or pdf_path.stat().st_size == 0:
         raise ResuError("The browser did not produce a PDF; use the browser's Save as PDF instead")
     return pdf_path
@@ -311,6 +330,9 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> d
             outputs["note"] = "No accepted resume yet; only the review page was written. Use --proposal to preview."
             return outputs
         resume, target = pkg["resume"], folder / "resume.html"
+        state = package_mod.review_state(job, pkg, prof)
+        if state != package_mod.APPROVED:
+            outputs["note"] = f"Package is {state.upper()}; this resume has not been approved in its current form."
     target.write_text(resume_html(prof, resume, f"{prof['contact']['name']} — Resume"), encoding="utf-8")
     outputs["resume"] = str(target)
     if want_pdf:
