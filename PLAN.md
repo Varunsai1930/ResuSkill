@@ -29,7 +29,7 @@ The agent never edits stored data files directly. All writes go through the CLI,
 
 ## 3. Design decisions
 
-- **Standard library only.** The CLI needs Python 3.10+ and nothing else, so installing the skill needs no `pip install`.
+- **Standard library only.** The CLI needs Python 3.9+ (the version built into macOS) and nothing else, so installing the skill needs no `pip install`.
 - **One portable skill folder.** `skills/resuskill/` uses the shared `SKILL.md` format. It works in Claude Code (`~/.claude/skills/`) and Codex (`~/.codex/skills/`). Codex UI metadata lives in `agents/openai.yaml`.
 - **Local, readable storage.** Data lives in `~/.resuskill/` (override with `RESUSKILL_HOME`) as JSON files the user can read, back up or keep in git.
 - **AI provider.** The user's own Claude or Codex session. Profile content is sent to that provider as part of normal agent use, so no separate anonymization step is needed. The README states this clearly.
@@ -143,7 +143,7 @@ ResuSkill/
 
 ## 8. Tests
 
-The tests use `unittest` (no dependencies) with synthetic, non-identifying fixtures. They run in CI on Python 3.10–3.13. Required scenarios:
+The tests use `unittest` (no dependencies) with synthetic, non-identifying fixtures. They run in CI on Linux, macOS and Windows with Python 3.9–3.13. Required scenarios:
 
 - Unsupported requirement excerpts are rejected, and nothing is saved.
 - Missing information stays Unknown. Explicit conflicts show as Unmet.
