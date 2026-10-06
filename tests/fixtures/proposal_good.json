@@ -1,0 +1,24 @@
+{
+  "summary": {
+    "text": "Computer science student building Python backend services and REST APIs.",
+    "sources": ["summary", "exp-1-b1"]
+  },
+  "experience": [
+    {
+      "entry": "exp-1",
+      "bullets": [
+        {"text": "Built a Python Flask REST API serving reporting data to 1,200 internal users", "sources": ["exp-1-b1"]},
+        {"text": "Cut report generation time 35% with targeted PostgreSQL indexes", "sources": ["exp-1-b2"]}
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "entry": "proj-1",
+      "bullets": [
+        {"text": "Created a Python chat bot that tracks team tasks in SQLite, used by 3 student clubs", "sources": ["proj-1-b1", "proj-1-b2"]}
+      ]
+    }
+  ],
+  "skills": ["Python", "SQL", "PostgreSQL", "Flask", "Git"]
+}
