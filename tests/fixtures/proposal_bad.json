@@ -1,0 +1,15 @@
+{
+  "experience": [
+    {
+      "entry": "exp-1",
+      "bullets": [
+        {"text": "Built Java and Kafka pipelines serving 1,200 users", "sources": ["exp-1-b1"]},
+        {"text": "Reduced report generation time by 60% using PostgreSQL indexes", "sources": ["exp-1-b2"]},
+        {"text": "AWS Certified engineer who wrote unit tests for billing", "sources": ["exp-1-b3"]},
+        {"text": "Created a chat bot used by 3 student clubs", "sources": ["proj-1-b2"]},
+        {"text": "Led the 2023 platform migration", "sources": ["exp-1-b9"]}
+      ]
+    }
+  ],
+  "skills": ["Python", "Java"]
+}
