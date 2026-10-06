@@ -1,0 +1,4 @@
+interface:
+  display_name: "ResuSkill"
+  short_description: "Tailor resumes and answers from verified facts"
+  default_prompt: "Use $resuskill to check my fit for this job and tailor my resume without inventing anything."
