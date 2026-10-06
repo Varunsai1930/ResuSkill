@@ -1,0 +1,15 @@
+{
+  "name": "resuskill",
+  "description": "ResuSkill: honest, evidence-backed job application packages",
+  "owner": {
+    "name": "Varunsai1930",
+    "url": "https://github.com/Varunsai1930"
+  },
+  "plugins": [
+    {
+      "name": "resuskill",
+      "source": "./",
+      "description": "Tailor resumes and application answers from your verified profile, with a deterministic requirement checklist and manual submission."
+    }
+  ]
+}
