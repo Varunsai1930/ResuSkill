@@ -406,7 +406,7 @@ def sources(prof: dict) -> dict[str, dict]:
         index["summary"] = {"kind": "summary", "entry": None, "text": prof["summary"], "technologies": []}
     for section in ENTRY_SECTIONS:
         for entry in prof.get(section) or []:
-            label = " ".join(
+            label = " \u00b7 ".join(
                 _clean_str(entry.get(f))
                 for f in ("title", "role", "organization", "name", "degree", "field", "institution")
                 if entry.get(f)
