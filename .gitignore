@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+
+# Local candidate data and generated output must never be committed
+.resuskill/
+resuskill-data/
+*.pdf
