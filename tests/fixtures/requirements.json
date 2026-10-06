@@ -1,0 +1,58 @@
+[
+  {
+    "id": "r1",
+    "text": "Experience with Python and SQL",
+    "category": "skill",
+    "importance": "required",
+    "excerpt": "Strong experience with Python and SQL.",
+    "criterion": {"type": "skill", "skills": ["Python", "SQL"], "match": "all"}
+  },
+  {
+    "id": "r2",
+    "text": "Pursuing a bachelor's in Computer Science or related",
+    "category": "education",
+    "importance": "required",
+    "excerpt": "Pursuing a Bachelor's degree in Computer Science or a related field.",
+    "criterion": {"type": "degree", "level": "bachelor", "fields": ["Computer Science"], "status": "pursuing"}
+  },
+  {
+    "id": "r3",
+    "text": "US work authorization without sponsorship",
+    "category": "authorization",
+    "importance": "required",
+    "excerpt": "Must be authorized to work in the United States; we do not sponsor visas",
+    "criterion": {"type": "authorization", "country": "US", "sponsorship_available": false}
+  },
+  {
+    "id": "r4",
+    "text": "Experience building REST APIs",
+    "category": "experience",
+    "importance": "required",
+    "excerpt": "Experience building REST APIs.",
+    "criterion": null
+  },
+  {
+    "id": "r5",
+    "text": "Java or Kafka",
+    "category": "skill",
+    "importance": "preferred",
+    "excerpt": "Familiarity with Java or Kafka.",
+    "criterion": {"type": "skill", "skills": ["Java", "Kafka"], "match": "any"}
+  },
+  {
+    "id": "r6",
+    "text": "Rust",
+    "category": "skill",
+    "importance": "preferred",
+    "excerpt": "Experience with Rust.",
+    "criterion": {"type": "skill", "skills": ["Rust"], "match": "all"}
+  },
+  {
+    "id": "r7",
+    "text": "Hybrid in Austin",
+    "category": "location",
+    "importance": "unspecified",
+    "excerpt": "Austin, TX, hybrid",
+    "criterion": {"type": "location", "locations": ["Austin"], "work_mode": "hybrid"}
+  }
+]
