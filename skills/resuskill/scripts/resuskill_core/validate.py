@@ -24,7 +24,8 @@ _NUMBER_WORDS = {
     "twice": "2", "doubled": "2", "tripled": "3",
     "quadrupled": "4", "halved": "0.5", "tenfold": "10",
 }
-_WORD_RE = re.compile(r"\b(" + "|".join(_NUMBER_WORDS) + r")\b", re.IGNORECASE)
+# A trailing "s" covers scale words used loosely: "hundreds", "thousands", "millions", "dozens".
+_WORD_RE = re.compile(r"\b(" + "|".join(_NUMBER_WORDS) + r")s?\b", re.IGNORECASE)
 
 # Credential-like claims, grouped so different spellings compare equal.
 _CREDENTIALS = {

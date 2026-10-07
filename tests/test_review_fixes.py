@@ -40,3 +40,9 @@ class FabricationCheckTests(unittest.TestCase):
     def test_slash_separated_technologies_are_detected(self):
         self.assertEqual(skills.find_terms("Built APIs in Python/Django"), {"python", "django"})
         self.assertEqual(skills.find_terms("C/C++ and CI/CD"), {"c", "c++", "continuous integration"})
+
+    def test_plural_number_words_count_as_numbers(self):
+        self.assertEqual(validate.numbers("used by millions of users"), {"1000000"})
+        self.assertEqual(validate.numbers("thousands of requests, dozens of teams"), {"1000", "12"})
+        problems = validate.claim_problems("Dashboard used by millions of users", ["Built a dashboard for users"], set(), ())
+        self.assertTrue(problems)
