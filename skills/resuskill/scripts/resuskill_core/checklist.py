@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import re
+
 from . import jobs as jobs_mod
 from . import profile as profile_mod
 from .skills import canon
@@ -35,11 +37,16 @@ def _skill(crit: dict, prof: dict) -> tuple[str, str]:
     return UNKNOWN, f"Not in profile: {', '.join(missing)}"
 
 
+def _phrase_in(needle: str, haystack: str) -> bool:
+    """True when ``needle`` appears in ``haystack`` as whole words (both normalized)."""
+    return bool(needle) and re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
+
+
 def _field_matches(field: str, wanted: list[str]) -> bool:
     if not wanted:
         return True
     field_n = norm_text(field)
-    return bool(field_n) and any(norm_text(w) in field_n or field_n in norm_text(w) for w in wanted)
+    return bool(field_n) and any(_phrase_in(norm_text(w), field_n) or _phrase_in(field_n, norm_text(w)) for w in wanted)
 
 
 def _degree(crit: dict, prof: dict) -> tuple[str, str]:
