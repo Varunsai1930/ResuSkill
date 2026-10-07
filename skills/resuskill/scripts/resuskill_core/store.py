@@ -71,14 +71,25 @@ def write_json(path: Path, data) -> None:
         raise
 
 
-def load_input(path_arg: str):
-    """Load agent-supplied JSON from a file path, or from stdin when the path is '-'."""
+def _read_stdin() -> str:
+    """Stdin as UTF-8 regardless of locale (Windows pipes default to a legacy code page)."""
     import sys
 
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:
+        return sys.stdin.read()
+    try:
+        return buffer.read().decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ResuError(f"Input on stdin is not UTF-8 text: {exc}") from exc
+
+
+def load_input(path_arg: str):
+    """Load agent-supplied JSON from a file path, or from stdin when the path is '-'."""
     try:
         if path_arg == "-":
-            return json.load(sys.stdin)
-        with open(Path(path_arg).expanduser(), encoding="utf-8") as fh:
+            return json.loads(_read_stdin())
+        with open(Path(path_arg).expanduser(), encoding="utf-8-sig") as fh:
             return json.load(fh)
     except FileNotFoundError as exc:
         raise ResuError(f"Input file not found: {path_arg}") from exc
@@ -87,11 +98,9 @@ def load_input(path_arg: str):
 
 
 def load_text(path_arg: str) -> str:
-    import sys
-
     if path_arg == "-":
-        return sys.stdin.read()
+        return _read_stdin()
     try:
-        return Path(path_arg).expanduser().read_text(encoding="utf-8")
+        return Path(path_arg).expanduser().read_text(encoding="utf-8-sig")
     except FileNotFoundError as exc:
         raise ResuError(f"Input file not found: {path_arg}") from exc

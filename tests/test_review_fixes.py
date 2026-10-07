@@ -1,8 +1,11 @@
 """Regression tests for issues found in code review."""
 
+import os
+import subprocess
+import sys
 import unittest
 
-from helpers import IsolatedHome
+from helpers import ROOT, IsolatedHome
 
 from resuskill_core import checklist, jobs, package, profile, questions, render, skills, validate
 from resuskill_core.util import ResuError
@@ -124,3 +127,16 @@ class RenderStaleTests(IsolatedHome):
         with self.assertRaises(ResuError) as ctx:
             render.render(job_id)
         self.assertIn(entry["id"], str(ctx.exception))
+
+
+class EncodingTests(IsolatedHome):
+    def run_cli(self, *args, stdin: bytes = b""):
+        env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
+        script = ROOT / "skills" / "resuskill" / "scripts" / "resuskill.py"
+        return subprocess.run([sys.executable, str(script), *args], input=stdin, capture_output=True, env=env, check=True)
+
+    def test_non_ascii_round_trips_through_stdin_and_stdout(self):
+        description = "Need Python \u2265 3 years. Team lead: \u0141ukasz \u6771\u4eac \u2713"
+        self.run_cli("job", "add", "--company", "Co", "--title", "Eng", "--description-file", "-", stdin=description.encode("utf-8"))
+        shown = self.run_cli("job", "show", "co-eng", "--description").stdout.decode("utf-8")
+        self.assertEqual(shown.strip(), description)
