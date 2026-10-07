@@ -46,3 +46,12 @@ class FabricationCheckTests(unittest.TestCase):
         self.assertEqual(validate.numbers("thousands of requests, dozens of teams"), {"1000", "12"})
         problems = validate.claim_problems("Dashboard used by millions of users", ["Built a dashboard for users"], set(), ())
         self.assertTrue(problems)
+
+    def test_degree_claims_are_compared_by_level(self):
+        self.assertIn("master's degree", validate.credentials("M.S. graduate"))
+        self.assertIn("master's degree", validate.credentials("Master of Science in CS"))
+        self.assertIn("master's degree", validate.credentials("Master’s degree"))
+        self.assertIn("bachelor's degree", validate.credentials("B.Tech in ECE"))
+        problems = validate.claim_problems("Master's degree holder", ["Bachelor's degree · Computer Science"], set(), ())
+        self.assertTrue(any("master's degree" in p for p in problems))
+        self.assertEqual(validate.claim_problems("Bachelor of Science graduate", ["B.S. · Computer Science"], set(), ()), [])

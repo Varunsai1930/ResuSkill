@@ -34,7 +34,11 @@ _CREDENTIALS = {
     "patent": r"patent(?:s|ed)?",
     "award": r"award(?:s|ed|-winning)?",
     "doctorate": r"ph\.?\s?d\.?|doctorate|doctoral",
-    "degree": r"degree|bachelor'?s|master'?s|mba",
+    # Degree levels are separate so a source naming one degree cannot back a claim of another.
+    "bachelor's degree": r"bachelor'?s|bachelors?\s+of|b\.(?:s|a|sc|e|eng|tech)\.?|bsc|b\.?tech|beng",
+    "master's degree": r"master'?s|masters?\s+of|m\.(?:s|a|sc|eng|tech)\.?|msc|m\.?tech|meng",
+    "mba": r"mba",
+    "degree": r"degree",
     "professional credential": r"\b(?:cpa|pmp|cfa|cissp|ccna)\b",
     "publication": r"publish(?:ed|ing)?|publications?|peer[- ]reviewed",
     "honor": r"cum laude|dean'?s list|scholarship|fellowship|valedictorian",
@@ -55,7 +59,8 @@ def numbers(text: str) -> set[str]:
 
 
 def credentials(text: str) -> set[str]:
-    return {name for name, regex in _CREDENTIAL_RES.items() if regex.search(text or "")}
+    text = norm_text(text)  # unify curly apostrophes so "Master’s" matches
+    return {name for name, regex in _CREDENTIAL_RES.items() if regex.search(text)}
 
 
 def claim_problems(text: str, source_texts: list[str], allowed_tech: set[str], extra_terms) -> list[str]:
