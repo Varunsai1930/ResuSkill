@@ -4,7 +4,7 @@ import unittest
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs, skills, validate
+from resuskill_core import checklist, jobs, profile, skills, validate
 
 
 class ChecklistMatchingTests(unittest.TestCase):
@@ -55,3 +55,15 @@ class FabricationCheckTests(unittest.TestCase):
         problems = validate.claim_problems("Master's degree holder", ["Bachelor's degree · Computer Science"], set(), ())
         self.assertTrue(any("master's degree" in p for p in problems))
         self.assertEqual(validate.claim_problems("Bachelor of Science graduate", ["B.S. · Computer Science"], set(), ()), [])
+
+
+class ProfileIdTests(IsolatedHome):
+    def test_deleted_bullet_id_is_not_reused(self):
+        profile.save({"contact": {"name": "A"}, "experience": [{"organization": "O", "title": "T", "start": "2020", "bullets": ["a", "b", "c"]}]})
+        data = profile.load()
+        data["experience"][0]["bullets"] = data["experience"][0]["bullets"][:2]
+        profile.save(data)
+        data = profile.load()
+        data["experience"][0]["bullets"].append({"text": "new"})
+        prof, _, _ = profile.save(data)
+        self.assertEqual([b["id"] for b in prof["experience"][0]["bullets"]], ["exp-1-b1", "exp-1-b2", "exp-1-b4"])

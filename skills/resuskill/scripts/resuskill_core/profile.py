@@ -203,7 +203,8 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             entry["technologies"] = [display(_clean_str(t)) for t in _as_list(entry.get("technologies"), f"{where}.technologies", errors) if _clean_str(t)]
 
             prev_bullets = {norm_text(b.get("text", "")): b.get("id") for b in (previous or {}).get("bullets") or [] if isinstance(b, dict)}
-            bullet_n = _bullet_counter(entry_id, previous, raw)
+            # The counter is kept in _meta.id_counters so a deleted bullet's ID is never reused.
+            bullet_n = max(_bullet_counter(entry_id, previous, raw), counters.get(f"{entry_id}-b", 0))
             bullets = []
             used_bullet_ids: set[str] = set()
             for b_index, bullet in enumerate(_as_list(entry.get("bullets"), f"{where}.bullets", errors)):
@@ -228,6 +229,8 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
                 used_bullet_ids.add(bullet_id)
                 bullets.append({"id": bullet_id, "text": text})
             entry["bullets"] = bullets
+            if bullet_n:
+                counters[f"{entry_id}-b"] = bullet_n
             entries.append(entry)
         prof[section] = entries
 
