@@ -22,6 +22,17 @@ class ChecklistMatchingTests(unittest.TestCase):
         self.assertEqual(checklist._location({"locations": ["New York"]}, prof)[0], checklist.MET)
 
 
+    def test_partial_dates_are_unknown_when_ambiguous(self):
+        grad = lambda end, **crit: checklist._graduation(crit, {"education": [{"end": end}]})[0]
+        self.assertEqual(grad("2026", **{"from": "2026-03"}), checklist.UNKNOWN)
+        self.assertEqual(grad("2026", **{"to": "2026-06"}), checklist.UNKNOWN)
+        self.assertEqual(grad("2025", **{"from": "2026-03"}), checklist.UNMET)
+        self.assertEqual(grad("2026-05", **{"from": "2026-03", "to": "2026-06"}), checklist.MET)
+        avail = lambda start: checklist._availability({"start_by": "2026-03"}, {"availability": {"start_date": start}})[0]
+        self.assertEqual(avail("2026"), checklist.UNKNOWN)
+        self.assertEqual(avail("2026-02"), checklist.MET)
+        self.assertEqual(avail("2027"), checklist.UNMET)
+
 class RequirementIdTests(IsolatedHome):
     def test_resave_keeps_ids_and_drops_links_for_changed_requirements(self):
         job_id = jobs.add("Co", "Eng", "Need Python. Need Docker. Need Kubernetes.")["id"]

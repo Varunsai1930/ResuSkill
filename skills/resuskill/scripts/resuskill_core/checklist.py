@@ -79,11 +79,20 @@ def _graduation(crit: dict, prof: dict) -> tuple[str, str]:
     grad = profile_mod.graduation_date(prof)
     if not grad:
         return UNKNOWN, "No graduation date in profile"
-    grad_key = date_key(grad)
-    if crit.get("from") and grad_key < date_key(crit["from"]):
-        return UNMET, f"Graduation {grad} is before {crit['from']}"
-    if crit.get("to") and grad_key > date_key(crit["to"], end_of_period=True):
-        return UNMET, f"Graduation {grad} is after {crit['to']}"
+    # A partial date ("2026") spans a period; only a comparison that holds for the whole period counts.
+    earliest, latest = date_key(grad), date_key(grad, end_of_period=True)
+    if crit.get("from"):
+        start = date_key(crit["from"])
+        if latest < start:
+            return UNMET, f"Graduation {grad} is before {crit['from']}"
+        if earliest < start:
+            return UNKNOWN, f"Graduation {grad} is not precise enough to compare with {crit['from']}"
+    if crit.get("to"):
+        end = date_key(crit["to"], end_of_period=True)
+        if earliest > end:
+            return UNMET, f"Graduation {grad} is after {crit['to']}"
+        if latest > end:
+            return UNKNOWN, f"Graduation {grad} is not precise enough to compare with {crit['to']}"
     return MET, f"Graduation {grad} is inside the window"
 
 
@@ -142,8 +151,12 @@ def _availability(crit: dict, prof: dict) -> tuple[str, str]:
     start = (prof.get("availability") or {}).get("start_date")
     if not start:
         return UNKNOWN, "No start date in profile"
-    if crit.get("start_by") and date_key(start) > date_key(crit["start_by"], end_of_period=True):
-        return UNMET, f"Available from {start}, after {crit['start_by']}"
+    if crit.get("start_by"):
+        deadline = date_key(crit["start_by"], end_of_period=True)
+        if date_key(start) > deadline:
+            return UNMET, f"Available from {start}, after {crit['start_by']}"
+        if date_key(start, end_of_period=True) > deadline:
+            return UNKNOWN, f"Start date {start} is not precise enough to compare with {crit['start_by']}"
     return MET, f"Available from {start}"
 
 
