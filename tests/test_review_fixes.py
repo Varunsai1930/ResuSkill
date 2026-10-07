@@ -4,7 +4,7 @@ import unittest
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs, package, profile, questions, skills, validate
+from resuskill_core import checklist, jobs, package, profile, questions, render, skills, validate
 from resuskill_core.util import ResuError
 
 
@@ -98,3 +98,18 @@ class SensitiveCategoryTests(IsolatedHome):
         with self.assertRaises(ResuError):
             package.set_category(job_id, "q2", "factual")
         self.assertEqual(package.set_category(job_id, "q2", "sensitive")["category"], "sensitive")
+
+
+class RenderStaleTests(IsolatedHome):
+    def test_render_reports_entries_removed_from_profile(self):
+        job_id = self.seed()
+        prof = profile.load()
+        entry = prof["projects"][0]
+        package.propose_resume(job_id, {"projects": [{"entry": entry["id"], "bullets": [
+            {"text": entry["bullets"][0]["text"], "sources": [entry["bullets"][0]["id"]]}]}]})
+        package.accept_resume(job_id)
+        prof["projects"] = []
+        profile.save(prof)
+        with self.assertRaises(ResuError) as ctx:
+            render.render(job_id)
+        self.assertIn(entry["id"], str(ctx.exception))

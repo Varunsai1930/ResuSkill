@@ -60,7 +60,22 @@ def _row(what: str, when: str) -> str:
     return f'<div class="row"><span class="what">{what}</span><span class="when">{_e(when)}</span></div>'
 
 
+def _missing_refs(prof: dict, resume: dict) -> list[str]:
+    """IDs the resume uses that the current profile no longer has."""
+    known = {e["id"] for e in prof.get("education") or []} | {c["id"] for c in prof.get("certifications") or []}
+    missing = [i for i in list(resume.get("education") or []) + list(resume.get("certifications") or []) if i not in known]
+    for section in ("experience", "projects"):
+        missing += [item["entry"] for item in resume.get(section) or [] if not profile_mod.entry_by_id(prof, item["entry"])]
+    return missing
+
+
 def resume_body(prof: dict, resume: dict) -> str:
+    missing = _missing_refs(prof, resume)
+    if missing:
+        raise ResuError(
+            f"The resume uses {', '.join(missing)}, which the profile no longer has. "
+            "Write and accept a new proposal before rendering."
+        )
     contact = prof["contact"]
     bits = []
     if contact.get("email"):
