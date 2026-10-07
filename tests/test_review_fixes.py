@@ -51,6 +51,16 @@ class RequirementIdTests(IsolatedHome):
         self.assertEqual(job["requirements"][0]["id"], "r4")
 
 
+    def test_string_where_a_list_is_expected_is_rejected(self):
+        job_id = jobs.add("Co", "Eng", "Need Python.")["id"]
+        for crit in ({"type": "skill", "skills": "Python"},
+                     {"type": "degree", "level": "bachelor", "fields": "Computer Science"},
+                     {"type": "location", "locations": "Austin"}):
+            with self.assertRaises(ResuError):
+                jobs.set_requirements(job_id, [{"text": "x", "excerpt": "Need Python", "criterion": crit}])
+        with self.assertRaises(ResuError):
+            profile.save({"contact": {"name": "A"}, "preferences": {"roles": "Backend Engineer"}})
+
 class FabricationCheckTests(unittest.TestCase):
     def test_slash_separated_technologies_are_detected(self):
         self.assertEqual(skills.find_terms("Built APIs in Python/Django"), {"python", "django"})

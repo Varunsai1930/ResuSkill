@@ -277,8 +277,8 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     if work_mode not in WORK_MODES:
         errors.append("preferences.work_mode must be remote, hybrid, onsite or any")
     prof["preferences"] = {
-        "roles": [_clean_str(r) for r in prefs.get("roles") or [] if _clean_str(r)],
-        "locations": [_clean_str(r) for r in prefs.get("locations") or [] if _clean_str(r)],
+        "roles": [_clean_str(r) for r in _as_list(prefs.get("roles"), "preferences.roles", errors) if _clean_str(r)],
+        "locations": [_clean_str(r) for r in _as_list(prefs.get("locations"), "preferences.locations", errors) if _clean_str(r)],
         "work_mode": work_mode,
     }
 

@@ -73,6 +73,17 @@ def add(company: str, title: str, description: str, location: str = "", url: str
 
 # ---------------------------------------------------------------- requirements
 
+def _str_list(crit: dict, field: str, where: str, errors: list[str]) -> list[str]:
+    """A list of non-empty strings; a bare string is an error, not a list of characters."""
+    value = crit.get(field)
+    if value in (None, []):
+        return []
+    if not isinstance(value, list):
+        errors.append(f"{where}.criterion.{field} must be a list")
+        return []
+    return [v.strip() for v in value if isinstance(v, str) and v.strip()]
+
+
 def _validate_criterion(crit, where: str, errors: list[str]):
     if crit in (None, {}):
         return None
@@ -85,7 +96,7 @@ def _validate_criterion(crit, where: str, errors: list[str]):
         return None
     clean = {"type": kind}
     if kind == "skill":
-        skills = [s.strip() for s in crit.get("skills") or [] if isinstance(s, str) and s.strip()]
+        skills = _str_list(crit, "skills", where, errors)
         if not skills:
             errors.append(f"{where}.criterion.skills must list at least one skill")
         match = crit.get("match", "all")
@@ -99,7 +110,7 @@ def _validate_criterion(crit, where: str, errors: list[str]):
         status = crit.get("status", "any")
         if status not in ("any", "completed", "pursuing"):
             errors.append(f"{where}.criterion.status must be any, completed or pursuing")
-        clean.update(level=level, fields=[f.strip() for f in crit.get("fields") or [] if isinstance(f, str) and f.strip()], status=status)
+        clean.update(level=level, fields=_str_list(crit, "fields", where, errors), status=status)
     elif kind == "graduation_window":
         start, end = crit.get("from"), crit.get("to")
         if not start and not end:
@@ -112,7 +123,7 @@ def _validate_criterion(crit, where: str, errors: list[str]):
         mode = crit.get("work_mode")
         if mode not in (None, "remote", "hybrid", "onsite"):
             errors.append(f"{where}.criterion.work_mode must be remote, hybrid, onsite or null")
-        locations = [l.strip() for l in crit.get("locations") or [] if isinstance(l, str) and l.strip()]
+        locations = _str_list(crit, "locations", where, errors)
         if not locations and not mode:
             errors.append(f"{where}.criterion needs locations and/or work_mode")
         clean.update(locations=locations, work_mode=mode)
