@@ -4,7 +4,7 @@ import unittest
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs, profile, skills, validate
+from resuskill_core import checklist, jobs, profile, questions, skills, validate
 
 
 class ChecklistMatchingTests(unittest.TestCase):
@@ -67,3 +67,19 @@ class ProfileIdTests(IsolatedHome):
         data["experience"][0]["bullets"].append({"text": "new"})
         prof, _, _ = profile.save(data)
         self.assertEqual([b["id"] for b in prof["experience"][0]["bullets"]], ["exp-1-b1", "exp-1-b2", "exp-1-b4"])
+
+
+class AuthorizationQuestionTests(unittest.TestCase):
+    PROF = {"authorization": [{"country": "US", "authorized": True, "requires_sponsorship": False}]}
+
+    def value(self, text):
+        return questions.factual_value("authorization", text, self.PROF)
+
+    def test_unlisted_country_is_not_answered_from_another_record(self):
+        self.assertIsNone(self.value("Are you authorized to work in Japan?"))
+        self.assertIsNone(self.value("Are you authorized to work in Indiana?"))
+
+    def test_known_country_and_unnamed_country_still_resolve(self):
+        self.assertEqual(self.value("Are you legally authorized to work in the US?"), "Yes")
+        self.assertEqual(self.value("Are you authorized to work in the U.S.?"), "Yes")
+        self.assertEqual(self.value("Are you legally authorized to work for any employer?"), "Yes")

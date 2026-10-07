@@ -43,10 +43,11 @@ _OPEN = re.compile(
     r"^(why|what|how|describe|tell us|explain|share|walk us|give an example|please describe)\b|"
     r"\bwhy\b|tell us about|describe|cover letter|anything else|interest(?:s|ed)? you"
 )
+# Matched as whole words after reducing the question to lowercase words ("U.S." -> "u s").
 _COUNTRIES = {
-    "US": ("united states", "u.s.", " us ", "usa", "america"),
+    "US": ("united states", "u s", "us", "usa", "america"),
     "CA": ("canada",),
-    "GB": ("united kingdom", " uk ", "britain", "england"),
+    "GB": ("united kingdom", "uk", "britain", "england"),
     "IN": ("india",),
     "DE": ("germany",),
     "AU": ("australia",),
@@ -77,12 +78,17 @@ def classify(text: str) -> tuple[str, str | None]:
     return UNKNOWN, None
 
 
+_NAMED_PLACE = re.compile(r"\bin\s+(?:the\s+)?[A-Z]")
+
+
 def _country(question: str, prof: dict) -> dict | None:
     records = prof.get("authorization") or []
-    padded = f" {norm_text(question)} "
+    words = " " + " ".join(re.findall(r"[a-z0-9]+", norm_text(question))) + " "
     for code, names in _COUNTRIES.items():
-        if any(name in padded for name in names):
+        if any(f" {name} " in words for name in names):
             return next((r for r in records if r["country"] == code), {"country": code})
+    if _NAMED_PLACE.search(question):
+        return None  # names a place we cannot map; never answer it from another country's record
     return records[0] if len(records) == 1 else None
 
 
