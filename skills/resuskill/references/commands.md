@@ -39,7 +39,7 @@
 |---|---|
 | `$RS questions add JOB --text "..." [--optional] [--limit N] [--unit chars\|words] [--category C]` | Add a question; the category is detected by rules |
 | `$RS questions list JOB` | Every question with its current answer and label |
-| `$RS questions categorize JOB QID factual\|sensitive_factual\|sensitive\|open` | Set the category the user chose |
+| `$RS questions categorize JOB QID factual\|sensitive_factual\|sensitive\|open` | Set the category the user chose; a question detected as sensitive can only stay sensitive |
 | `$RS questions remove JOB QID` | Remove a question |
 | `$RS answers propose JOB --file F [--model NAME]` | Store AI drafts for **open** questions (validated, pending review) |
 | `$RS answers accept JOB [QID...]` | Accept pending drafts (all when no IDs) |

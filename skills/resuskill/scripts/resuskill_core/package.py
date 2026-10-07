@@ -91,6 +91,17 @@ def _question(job: dict, qid: str) -> dict:
     raise ResuError(f"Job {job['id']} has no question {qid!r}")
 
 
+def _check_category_change(detected: str, key: str | None, category: str) -> None:
+    """Refuse category changes that would let the agent answer a question it must not."""
+    if detected in (q_mod.SENSITIVE, q_mod.SENSITIVE_FACTUAL) and category not in (q_mod.SENSITIVE, detected):
+        raise ResuError(
+            f"This question was detected as {detected}; it cannot become {category}. "
+            "The user answers it themselves with `answers set` (or `--skip` if optional)."
+        )
+    if category in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) and not key:
+        raise ResuError("No profile field matches this question; use open or sensitive instead")
+
+
 def add_question(job_id: str, text: str, required: bool, limit: int | None, unit: str, category: str | None) -> dict:
     text = text.strip()
     if not text:
@@ -102,8 +113,7 @@ def add_question(job_id: str, text: str, required: bool, limit: int | None, unit
     if category and category != detected:
         if category not in q_mod.CATEGORIES:
             raise ResuError(f"Category must be one of {', '.join(q_mod.CATEGORIES)}")
-        if category == q_mod.FACTUAL and not key:
-            raise ResuError("No profile field matches this question; use open or sensitive instead")
+        _check_category_change(detected, key, category)
         detected = category
     existing = [int(q["id"][1:]) for q in job.get("questions") or [] if q["id"][1:].isdigit()]
     question = {
@@ -127,9 +137,8 @@ def set_category(job_id: str, qid: str, category: str) -> dict:
         raise ResuError("Category must be factual, sensitive_factual, sensitive or open")
     job = jobs_mod.load(job_id)
     question = _question(job, qid)
-    _, key = q_mod.classify(question["text"])
-    if category in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) and not key:
-        raise ResuError("No profile field matches this question; use open or sensitive instead")
+    detected, key = q_mod.classify(question["text"])
+    _check_category_change(detected, key, category)
     question["category"] = category
     question["factual_key"] = key if category in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) else None
     jobs_mod.save(job)

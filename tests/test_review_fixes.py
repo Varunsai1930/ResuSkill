@@ -4,7 +4,8 @@ import unittest
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs, profile, questions, skills, validate
+from resuskill_core import checklist, jobs, package, profile, questions, skills, validate
+from resuskill_core.util import ResuError
 
 
 class ChecklistMatchingTests(unittest.TestCase):
@@ -83,3 +84,17 @@ class AuthorizationQuestionTests(unittest.TestCase):
         self.assertEqual(self.value("Are you legally authorized to work in the US?"), "Yes")
         self.assertEqual(self.value("Are you authorized to work in the U.S.?"), "Yes")
         self.assertEqual(self.value("Are you legally authorized to work for any employer?"), "Yes")
+
+
+class SensitiveCategoryTests(IsolatedHome):
+    def test_sensitive_question_cannot_be_made_open(self):
+        job_id = jobs.add("Co", "Eng", "Need Python.")["id"]
+        with self.assertRaises(ResuError):
+            package.add_question(job_id, "What are your salary expectations?", True, None, "chars", "open")
+        package.add_question(job_id, "What are your salary expectations?", True, None, "chars", None)
+        with self.assertRaises(ResuError):
+            package.set_category(job_id, "q1", "open")
+        package.add_question(job_id, "Will you require visa sponsorship?", True, None, "chars", None)
+        with self.assertRaises(ResuError):
+            package.set_category(job_id, "q2", "factual")
+        self.assertEqual(package.set_category(job_id, "q2", "sensitive")["category"], "sensitive")
