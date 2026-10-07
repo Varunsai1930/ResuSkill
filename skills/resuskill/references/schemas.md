@@ -40,6 +40,7 @@ Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are
 ```
 
 - `category`: `skill`, `education`, `experience`, `location`, `authorization`, `availability`, `other`.
+- `id` may be omitted: a requirement with the same `text` and `excerpt` as a saved one keeps its id, and new ones get an id never used before. Evidence links and overrides survive a re-save only for requirements that did not change.
 - `importance`: `required`, `preferred`, `unspecified`.
 - `criterion` is `null` when the requirement is not explicitly comparable. Types:
 

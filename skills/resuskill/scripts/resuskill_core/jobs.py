@@ -5,6 +5,8 @@ The job description is untrusted data. It is stored and quoted, never executed o
 
 from __future__ import annotations
 
+import re
+
 from . import store
 from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
 
@@ -147,6 +149,13 @@ def validate_requirements(job: dict, items) -> list[dict]:
     errors: list[str] = []
     clean: list[dict] = []
     used_ids: set[str] = set()
+    # Requirements without an id keep the id of the saved requirement with the same text and
+    # excerpt; new ones get a number never used before, so evidence and overrides stay attached.
+    previous = {_requirement_key(r): r["id"] for r in job.get("requirements") or []}
+    explicit = {str(i.get("id") or "").strip() for i in items if isinstance(i, dict)} - {""}
+    counter = max([int(job.get("requirement_counter", 0))] + [
+        int(m.group(1)) for rid in explicit | set(previous.values()) for m in [re.fullmatch(r"r(\d+)", rid)] if m
+    ])
     for index, item in enumerate(items):
         where = f"requirements[{index}]"
         if not isinstance(item, dict):
@@ -166,7 +175,14 @@ def validate_requirements(job: dict, items) -> list[dict]:
             errors.append(f"{where}.excerpt is required (a verbatim quote from the description)")
         elif norm_text(excerpt) not in description:
             errors.append(f"{where}.excerpt not found in the job description: {excerpt[:80]!r}")
-        req_id = str(item.get("id") or "").strip() or f"r{index + 1}"
+        req_id = str(item.get("id") or "").strip()
+        if not req_id:
+            reuse = previous.get(_requirement_key({"text": text, "excerpt": excerpt}))
+            if reuse and reuse not in used_ids and reuse not in explicit:
+                req_id = reuse
+            else:
+                counter += 1
+                req_id = f"r{counter}"
         if req_id in used_ids:
             errors.append(f"{where}.id {req_id!r} is duplicated")
         used_ids.add(req_id)
@@ -180,13 +196,21 @@ def validate_requirements(job: dict, items) -> list[dict]:
 def set_requirements(job_id: str, items) -> dict:
     job = load(job_id)
     reqs = validate_requirements(job, items)
-    ids = {r["id"] for r in reqs}
+    old = {r["id"]: r for r in job.get("requirements") or []}
+    # Evidence and overrides were confirmed for a specific requirement; drop them when it changed.
+    unchanged = {r["id"] for r in reqs if old.get(r["id"]) == r}
     job["requirements"] = reqs
-    job["evidence"] = {k: v for k, v in job.get("evidence", {}).items() if k in ids}
-    job["overrides"] = {k: v for k, v in job.get("overrides", {}).items() if k in ids}
+    job["evidence"] = {k: v for k, v in job.get("evidence", {}).items() if k in unchanged}
+    job["overrides"] = {k: v for k, v in job.get("overrides", {}).items() if k in unchanged}
+    numbers = [int(r["id"][1:]) for r in reqs if re.fullmatch(r"r\d+", r["id"])]
+    job["requirement_counter"] = max([int(job.get("requirement_counter", 0))] + numbers)
     job["revision"] += 1
     save(job)
     return job
+
+
+def _requirement_key(req: dict) -> str:
+    return f"{norm_text(req.get('text', ''))}|{norm_text(req.get('excerpt', ''))}"
 
 
 def requirement(job: dict, req_id: str) -> dict:
