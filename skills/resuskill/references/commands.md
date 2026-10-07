@@ -59,7 +59,7 @@ Answer labels: **From profile**, **AI draft**, **User answer**, **Missing inform
 | `$RS track JOB saved\|applied\|assessment\|interview\|rejected\|offer\|withdrawn [--note "..."]` | Update status; `applied` requires a current approved package and freezes a snapshot |
 | `$RS note JOB "text"` | Add a tracking note |
 
-Review state: **draft** (not approved), **approved**, **stale** (profile or job changed after approval). Snapshots live in `~/.resuskill/jobs/JOB/snapshots/<time>/` and never change.
+Review state: **draft** (not approved), **approved**, **stale** (profile or job changed after approval). Snapshots live in `~/.resuskill/jobs/JOB/snapshots/<time>/` and never change. A snapshot includes the resume PDF only if it was rendered (`render JOB --pdf`) from the approved resume and current profile; otherwise `package.json` records why it was left out.
 
 ## Environment
 - `RESUSKILL_HOME`: data directory (default `~/.resuskill`).

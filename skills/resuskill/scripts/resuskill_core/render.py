@@ -22,7 +22,7 @@ from . import package as package_mod
 from . import profile as profile_mod
 from . import store, validate
 from .skills import canon
-from .util import ResuError, slugify
+from .util import ResuError, content_hash, slugify
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "assets" / "resume_template.html"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -239,6 +239,15 @@ def pdf_name(prof: dict) -> str:
     return f"{slugify(prof['contact']['name'], 40).replace('-', '_').title()}_Resume.pdf"
 
 
+def pdf_stamp(prof: dict, resume: dict) -> dict:
+    """What a resume PDF was printed from, so a snapshot can tell a current PDF from a stale one."""
+    return {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"]}
+
+
+def stamp_path(pdf: Path) -> Path:
+    return pdf.with_name(pdf.name + ".json")
+
+
 def find_browser() -> str | None:
     override = os.environ.get("RESUSKILL_BROWSER")
     if override:
@@ -336,5 +345,9 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> d
     target.write_text(resume_html(prof, resume, f"{prof['contact']['name']} — Resume"), encoding="utf-8")
     outputs["resume"] = str(target)
     if want_pdf:
-        outputs["pdf"] = str(print_pdf(target, folder / (pdf_name(prof) if not use_proposal else "preview.pdf")))
+        pdf = folder / (pdf_name(prof) if not use_proposal else "preview.pdf")
+        stamp_path(pdf).unlink(missing_ok=True)
+        outputs["pdf"] = str(print_pdf(target, pdf))
+        if not use_proposal:
+            store.write_json(stamp_path(pdf), pdf_stamp(prof, resume))
     return outputs

@@ -170,3 +170,44 @@ class RenderTests(IsolatedHome):
         html = render.resume_html(prof, resume, "x")
         self.assertEqual(html.count('class="entry"'), 13)
         self.assertIn("break-inside: avoid", html)
+
+
+class SnapshotPdfTests(IsolatedHome):
+    def setUp(self):
+        super().setUp()
+        self.job_id = self.seed()
+
+    prepare = PackageFlowTests.prepare
+    answer_all = PackageFlowTests.answer_all
+
+    def fake_pdf(self, html_path, pdf_path):
+        pdf_path.write_bytes(b"%PDF-1.4 " + html_path.read_bytes()[:64])
+        return pdf_path
+
+    def test_snapshot_freezes_only_a_current_pdf(self):
+        self.prepare()
+        self.answer_all()
+        with mock.patch.object(render, "print_pdf", side_effect=self.fake_pdf):
+            render.render(self.job_id, want_pdf=True)
+        package.approve(self.job_id)
+        job = track.set_status(self.job_id, "applied")
+        folder = store.job_dir(self.job_id) / "snapshots" / job["tracking"]["snapshot"]
+        self.assertEqual(store.read_json(folder / "package.json")["pdf"], render.pdf_name(profile.load()))
+        self.assertTrue((folder / render.pdf_name(profile.load())).exists())
+
+    def test_snapshot_skips_a_pdf_printed_from_older_content(self):
+        self.prepare()
+        self.answer_all()
+        with mock.patch.object(render, "print_pdf", side_effect=self.fake_pdf):
+            render.render(self.job_id, want_pdf=True)
+        other = fixture("proposal_good.json")
+        other["experience"][0]["bullets"] = other["experience"][0]["bullets"][:1]
+        package.propose_resume(self.job_id, other)
+        package.accept_resume(self.job_id)
+        package.approve(self.job_id)
+        job = track.set_status(self.job_id, "applied")
+        folder = store.job_dir(self.job_id) / "snapshots" / job["tracking"]["snapshot"]
+        frozen = store.read_json(folder / "package.json")
+        self.assertIsNone(frozen["pdf"])
+        self.assertIn("different content", frozen["pdf_note"])
+        self.assertFalse((folder / render.pdf_name(profile.load())).exists())
