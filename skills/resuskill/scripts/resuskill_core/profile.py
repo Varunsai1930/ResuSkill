@@ -368,14 +368,28 @@ def diff(old: dict | None, new: dict) -> list[str]:
             label = entry.get("organization") or entry.get("institution") or entry.get("name")
             lines.append(f"- {section} {entry_id}: {label}")
 
-    old_skills = {canon(s["name"]): s["name"] for s in old.get("skills") or []}
-    new_skills = {canon(s["name"]): s["name"] for s in new["skills"]}
+    old_skills = {canon(s["name"]): s for s in old.get("skills") or []}
+    new_skills = {canon(s["name"]): s for s in new["skills"]}
     for key in new_skills.keys() - old_skills.keys():
-        lines.append(f"+ skill: {new_skills[key]}")
+        lines.append(f"+ skill: {new_skills[key]['name']}")
     for key in old_skills.keys() - new_skills.keys():
-        lines.append(f"- skill: {old_skills[key]}")
+        lines.append(f"- skill: {old_skills[key]['name']}")
+    for key in sorted(new_skills.keys() & old_skills.keys()):
+        for field in ("name", "category"):
+            compare(f"skill {new_skills[key]['name']}.{field}", old_skills[key].get(field), new_skills[key].get(field))
     compare("skills_absent", sorted(old.get("skills_absent") or []), sorted(new["skills_absent"]))
-    compare("certifications", [c.get("name") for c in old.get("certifications") or []], [c.get("name") for c in new["certifications"]])
+
+    old_certs = {c.get("id"): c for c in old.get("certifications") or []}
+    new_certs = {c.get("id"): c for c in new["certifications"]}
+    for cert_id, cert in new_certs.items():
+        before = old_certs.get(cert_id)
+        if before is None:
+            lines.append(f"+ certification {cert_id}: {cert.get('name')}")
+            continue
+        for field in sorted((set(cert) | set(before)) - {"id"}):
+            compare(f"certifications.{cert_id}.{field}", before.get(field), cert.get(field))
+    for cert_id in old_certs.keys() - new_certs.keys():
+        lines.append(f"- certification {cert_id}: {old_certs[cert_id].get('name')}")
     for key in ("preferences", "availability", "authorization"):
         compare(key, old.get(key), new.get(key))
     return lines

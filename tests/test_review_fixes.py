@@ -84,6 +84,17 @@ class ProfileIdTests(IsolatedHome):
         self.assertEqual([b["id"] for b in prof["experience"][0]["bullets"]], ["exp-1-b1", "exp-1-b2", "exp-1-b4"])
 
 
+    def test_diff_shows_certification_and_skill_category_edits(self):
+        profile.save({"contact": {"name": "A"}, "skills": [{"name": "Python", "category": "Languages"}],
+                      "certifications": [{"name": "AWS CCP", "issuer": "AWS", "date": "2023-05"}]})
+        data = profile.load()
+        data["certifications"][0]["date"] = "2021-05"
+        data["skills"][0]["category"] = "Tools"
+        new, _ = profile.normalize(data, profile.load())
+        changes = profile.diff(profile.load(), new)
+        self.assertIn("~ certifications.cert-1.date: 2023-05 -> 2021-05", changes)
+        self.assertIn("~ skill Python.category: Languages -> Tools", changes)
+
 class AuthorizationQuestionTests(unittest.TestCase):
     PROF = {"authorization": [{"country": "US", "authorized": True, "requires_sponsorship": False}]}
 
