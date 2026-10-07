@@ -105,7 +105,7 @@ def _location(crit: dict, prof: dict) -> tuple[str, str]:
         places = [norm_text(p) for p in prefs.get("locations") or []]
         if prof.get("contact", {}).get("location"):
             places.append(norm_text(prof["contact"]["location"]))
-        hits = [loc for loc in crit["locations"] if any(norm_text(loc) in p or p in norm_text(loc) for p in places if p)]
+        hits = [loc for loc in crit["locations"] if any(_phrase_in(norm_text(loc), p) or _phrase_in(p, norm_text(loc)) for p in places if p)]
         if hits:
             results.append((MET, f"Profile location/preferences include {', '.join(hits)}"))
         else:
