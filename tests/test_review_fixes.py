@@ -4,7 +4,7 @@ import unittest
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs
+from resuskill_core import checklist, jobs, skills, validate
 
 
 class ChecklistMatchingTests(unittest.TestCase):
@@ -34,3 +34,9 @@ class RequirementIdTests(IsolatedHome):
         self.assertEqual(job["overrides"], {})
         job = jobs.set_requirements(job_id, [{"text": "Python", "excerpt": "Need Python"}])
         self.assertEqual(job["requirements"][0]["id"], "r4")
+
+
+class FabricationCheckTests(unittest.TestCase):
+    def test_slash_separated_technologies_are_detected(self):
+        self.assertEqual(skills.find_terms("Built APIs in Python/Django"), {"python", "django"})
+        self.assertEqual(skills.find_terms("C/C++ and CI/CD"), {"c", "c++", "continuous integration"})
