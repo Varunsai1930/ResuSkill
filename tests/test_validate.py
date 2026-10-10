@@ -78,7 +78,8 @@ class AnswerValidationTests(IsolatedHome):
 
     def test_profile_skill_may_be_mentioned(self):
         job_id = self.seed()
-        errors = validate.validate_answer(profile.load(), jobs.load(job_id), "I enjoy working in Python and SQL.", [], None, "chars")
+        errors = validate.validate_answer(profile.load(), jobs.load(job_id), "I enjoy working in Python and SQL.",
+                                          ["skill:python", "skill:sql"], None, "chars")
         self.assertEqual(errors, [])
 
 

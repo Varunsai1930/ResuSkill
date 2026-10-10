@@ -12,7 +12,7 @@ import re
 from . import jobs as jobs_mod
 from . import profile as profile_mod
 from .skills import canon
-from .util import ResuError, date_key, norm_text, now_iso
+from .util import ResuError, content_hash, date_key, norm_text, now_iso
 
 MET, UNMET, UNKNOWN = "met", "unmet", "unknown"
 STATUSES = (MET, UNMET, UNKNOWN)
@@ -141,7 +141,7 @@ def _authorization(crit: dict, prof: dict) -> tuple[str, str]:
             return UNKNOWN, "Sponsorship need is not recorded"
         return MET, f"Authorized to work in {crit['country']}"
     if sponsor is True:
-        return MET, "Not yet authorized, but the job offers sponsorship"
+        return UNKNOWN, "Job offers sponsorship, but the user's eligibility is not established"
     if sponsor is False:
         return UNMET, f"Not authorized in {crit['country']} and the job offers no sponsorship"
     return UNKNOWN, "Not authorized; job does not say if it sponsors"
@@ -174,9 +174,14 @@ def evaluate(job: dict, prof: dict) -> list[dict]:
     sources = profile_mod.sources(prof)
     results = []
     for req in job["requirements"]:
-        evidence_ids = [i for i in (job.get("evidence", {}).get(req["id"]) or {}).get("sources", [])]
+        link = job.get("evidence", {}).get(req["id"]) or {}
+        evidence_ids = link.get("sources", [])
+        hashes = link.get("source_hashes")
+        stale_links = [i for i in evidence_ids if i not in sources or (
+            hashes.get(i) != content_hash(sources[i]) if hashes is not None
+            else link.get("profile_revision") != prof["_meta"]["revision"]
+        )]
         evidence = [{"id": i, "text": sources[i]["text"]} for i in evidence_ids if i in sources]
-        stale_links = [i for i in evidence_ids if i not in sources]
         crit = req.get("criterion")
         if crit and crit["type"] in CHECKS:
             status, basis = CHECKS[crit["type"]](crit, prof)
@@ -184,12 +189,17 @@ def evaluate(job: dict, prof: dict) -> list[dict]:
             status, basis = UNKNOWN, "Years of experience need confirmed evidence"
         else:
             status, basis = UNKNOWN, "No comparable criterion; needs confirmed evidence"
-        if status == UNKNOWN and evidence:
+        if status == UNKNOWN and evidence and not stale_links:
             status, basis = MET, "User confirmed supporting evidence"
+        if stale_links:
+            basis += "; evidence changed or was removed; ask the user to confirm again"
         override = job.get("overrides", {}).get(req["id"])
-        if override:
+        current_override = override and override.get("profile_revision") == prof["_meta"]["revision"]
+        if current_override:
             basis = f"User override: {override['reason']} (computed: {status})"
             status = override["status"]
+        elif override:
+            basis += "; previous override needs confirmation for the current profile"
         results.append({
             "id": req["id"],
             "text": req["text"],
@@ -200,7 +210,7 @@ def evaluate(job: dict, prof: dict) -> list[dict]:
             "basis": basis,
             "evidence": evidence,
             "stale_links": stale_links,
-            "overridden": bool(override),
+            "overridden": bool(current_override),
         })
     return results
 
@@ -224,9 +234,13 @@ def link(job_id: str, req_id: str, source_ids: list[str]) -> dict:
         raise ResuError(f"Unknown profile source id(s): {', '.join(unknown)}. Use `profile show` to see IDs.")
     if not source_ids:
         raise ResuError("Give at least one profile source id")
-    current = (job.setdefault("evidence", {}).get(req_id) or {}).get("sources", [])
-    merged = list(dict.fromkeys(current + source_ids))
-    job["evidence"][req_id] = {"sources": merged, "confirmed_at": now_iso(), "profile_revision": prof["_meta"]["revision"]}
+    # Replace the set: a new confirmation must not silently reaffirm old evidence.
+    merged = list(dict.fromkeys(source_ids))
+    job.setdefault("evidence", {})[req_id] = {
+        "sources": merged, "confirmed_at": now_iso(), "profile_revision": prof["_meta"]["revision"],
+        "source_hashes": {s: content_hash(sources[s]) for s in merged},
+    }
+    job["revision"] += 1
     jobs_mod.save(job)
     return job
 
@@ -235,6 +249,7 @@ def unlink(job_id: str, req_id: str) -> dict:
     job = jobs_mod.load(job_id)
     jobs_mod.requirement(job, req_id)
     job.get("evidence", {}).pop(req_id, None)
+    job["revision"] += 1
     jobs_mod.save(job)
     return job
 
@@ -249,6 +264,8 @@ def override(job_id: str, req_id: str, status: str, reason: str) -> dict:
             raise ResuError(f"Status must be one of {', '.join(STATUSES)} or 'clear'")
         if not reason or not reason.strip():
             raise ResuError("An override needs a reason")
-        job.setdefault("overrides", {})[req_id] = {"status": status, "reason": reason.strip(), "at": now_iso()}
+        job.setdefault("overrides", {})[req_id] = {"status": status, "reason": reason.strip(), "at": now_iso(),
+                                                    "profile_revision": profile_mod.revision()}
+    job["revision"] += 1
     jobs_mod.save(job)
     return job

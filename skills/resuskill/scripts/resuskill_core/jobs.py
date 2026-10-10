@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from . import store
+from . import store, input_schema
 from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
 
 CATEGORIES = {"skill", "education", "experience", "location", "authorization", "availability", "other"}
@@ -23,10 +23,12 @@ def load(job_id: str) -> dict:
     job = store.read_json(store.job_dir(job_id) / "job.json")
     if job is None:
         raise ResuError(f"Job {job_id!r} is missing job.json")
+    store.check_version(job, "job")
     return job
 
 
 def save(job: dict) -> None:
+    job["schema_version"] = 1
     job["updated_at"] = now_iso()
     store.write_json(store.job_dir(job["id"]) / "job.json", job)
 
@@ -36,6 +38,7 @@ def list_jobs() -> list[dict]:
     for path in sorted(store.jobs_dir().iterdir()):
         data = store.read_json(path / "job.json") if path.is_dir() else None
         if data:
+            store.check_version(data, "job")
             jobs.append(data)
     return sorted(jobs, key=lambda j: j.get("created_at", ""), reverse=True)
 
@@ -153,9 +156,11 @@ def _validate_criterion(crit, where: str, errors: list[str]):
 
 def validate_requirements(job: dict, items) -> list[dict]:
     if isinstance(items, dict) and "requirements" in items:
+        input_schema.check(items, {"requirements": input_schema.REQUIREMENTS}, "requirement input")
         items = items["requirements"]
     if not isinstance(items, list):
         raise ResuError("Requirements must be a JSON list (or an object with a 'requirements' list)")
+    input_schema.check(items, input_schema.REQUIREMENTS, "requirements")
     description = norm_text(job["description"])
     errors: list[str] = []
     clean: list[dict] = []
@@ -211,6 +216,7 @@ def set_requirements(job_id: str, items) -> dict:
     # Evidence and overrides were confirmed for a specific requirement; drop them when it changed.
     unchanged = {r["id"] for r in reqs if old.get(r["id"]) == r}
     job["requirements"] = reqs
+    job["requirements_reviewed_at"] = now_iso()
     job["evidence"] = {k: v for k, v in job.get("evidence", {}).items() if k in unchanged}
     job["overrides"] = {k: v for k, v in job.get("overrides", {}).items() if k in unchanged}
     numbers = [int(r["id"][1:]) for r in reqs if re.fullmatch(r"r\d+", r["id"])]

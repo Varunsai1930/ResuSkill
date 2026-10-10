@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import re
 
-from . import SCHEMA_VERSION, store
+from . import SCHEMA_VERSION, store, input_schema
 from .skills import canon, display
 from .util import ResuError, is_valid_date, norm_text, now_iso
 
@@ -73,6 +73,12 @@ def load(required: bool = True) -> dict | None:
     data = store.read_json(store.profile_path())
     if data is None and required:
         raise ResuError("No profile saved yet. Create one with `profile template` and `profile save`.")
+    if data is not None:
+        store.check_version(data, "profile")
+        meta = data.get("_meta")
+        if not isinstance(meta, dict):
+            raise ResuError("Stored profile has no valid metadata; restore a profile backup")
+        store.check_version(data, "profile", meta.get("schema", 1))
     return data
 
 
@@ -147,12 +153,15 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     """Validate a proposed profile and assign stable IDs. Returns (profile, warnings)."""
     if not isinstance(data, dict):
         raise ResuError("Profile must be a JSON object")
+    if isinstance(data.get("_meta"), dict) and "schema" in data["_meta"]:
+        store.check_version(data, "profile", data["_meta"]["schema"])
+    input_schema.check(data, input_schema.PROFILE, "profile")
     errors: list[str] = []
     warnings: list[str] = []
     current = current or {}
     prof = copy.deepcopy(data)
     prof.pop("_meta", None)
-    counters = _seed_counters(current, data)
+    counters = _seed_counters(current, prof)
 
     contact = prof.get("contact") or {}
     if not isinstance(contact, dict):
@@ -251,12 +260,14 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     prof["skills"] = skills
 
     absent = []
+    entry_skills = {canon(t) for section in ("experience", "projects") for entry in prof[section]
+                    for t in entry.get("technologies") or []}
     for name in _as_list(prof.get("skills_absent"), "skills_absent", errors):
         name = _clean_str(name)
         if not name:
             continue
-        if canon(name) in seen_skills:
-            errors.append(f"{name!r} is listed in both skills and skills_absent")
+        if canon(name) in seen_skills | entry_skills:
+            errors.append(f"{name!r} is listed in both skills/entry technologies and skills_absent")
         absent.append(display(name))
     prof["skills_absent"] = absent
 
@@ -269,6 +280,9 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             errors.append(f"certifications[{index}].date is not a valid date")
         if not cert.get("id"):
             cert["id"] = _next_id(counters, "cert")
+        if not re.fullmatch(r"cert-\d+", cert["id"]) or cert["id"] in seen_ids:
+            errors.append(f"certifications[{index}].id must be a unique cert-N id")
+        seen_ids.add(cert["id"])
         certs.append(cert)
     prof["certifications"] = certs
 
@@ -289,11 +303,15 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     prof["availability"] = {"start_date": start, "notes": _clean_str(avail.get("notes"))}
 
     auths = []
+    countries = set()
     for index, auth in enumerate(_as_list(prof.get("authorization"), "authorization", errors)):
         if not isinstance(auth, dict) or not _clean_str(auth.get("country")):
             errors.append(f"authorization[{index}] needs a country")
             continue
         clean = {"country": _clean_str(auth["country"]).upper()}
+        if clean["country"] in countries:
+            errors.append(f"authorization[{index}]: duplicate country {clean['country']}")
+        countries.add(clean["country"])
         for field in ("authorized", "requires_sponsorship"):
             value = auth.get(field)
             if value not in (True, False, None):
@@ -351,6 +369,10 @@ def diff(old: dict | None, new: dict) -> list[str]:
             before = old_entries.get(entry_id)
             if before is None:
                 lines.append(f"+ {section} {entry_id}: {label} ({len(entry['bullets'])} bullets)")
+                for field, value in entry.items():
+                    if field not in ("id", "bullets") and value:
+                        lines.append(f"  {field}: {_fmt(value)}")
+                lines.extend(f"+ {b['id']}: {b['text']}" for b in entry["bullets"])
                 continue
             for field in sorted((set(entry) | set(before)) - {"bullets", "id"}):
                 compare(f"{section}.{entry_id}.{field}", before.get(field), entry.get(field))
@@ -385,6 +407,7 @@ def diff(old: dict | None, new: dict) -> list[str]:
         before = old_certs.get(cert_id)
         if before is None:
             lines.append(f"+ certification {cert_id}: {cert.get('name')}")
+            lines.append(f"  issuer: {_fmt(cert.get('issuer'))}; date: {_fmt(cert.get('date'))}")
             continue
         for field in sorted((set(cert) | set(before)) - {"id"}):
             compare(f"certifications.{cert_id}.{field}", before.get(field), cert.get(field))
@@ -421,6 +444,9 @@ def sources(prof: dict) -> dict[str, dict]:
     index: dict[str, dict] = {}
     if prof.get("summary"):
         index["summary"] = {"kind": "summary", "entry": None, "text": prof["summary"], "technologies": []}
+    for skill in prof.get("skills") or []:
+        index[f"skill:{canon(skill['name'])}"] = {"kind": "skill", "entry": None,
+                                                "text": skill["name"], "technologies": [skill["name"]]}
     for section in ENTRY_SECTIONS:
         for entry in prof.get(section) or []:
             label = " \u00b7 ".join(

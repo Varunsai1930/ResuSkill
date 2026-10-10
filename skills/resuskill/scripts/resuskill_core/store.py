@@ -10,6 +10,32 @@ from pathlib import Path
 from .util import ResuError
 
 
+_UNSET = object()
+
+
+def check_version(data, name: str, version=_UNSET) -> None:
+    from . import SCHEMA_VERSION
+
+    if not isinstance(data, dict):
+        raise ResuError(f"Stored {name} must be a JSON object; restore a valid backup")
+    value = data.get("schema_version", SCHEMA_VERSION) if version is _UNSET else version
+    if type(value) is not int or value != SCHEMA_VERSION:
+        raise ResuError(f"Unsupported {name} schema version {value!r}. Update ResuSkill or restore a compatible backup; data was not changed.")
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ResuError(f"Duplicate JSON key {key!r}; keep exactly one value")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(value):
+    raise ResuError(f"Invalid JSON number {value}; use a finite number or null")
+
+
 def home() -> Path:
     root = os.environ.get("RESUSKILL_HOME")
     path = Path(root).expanduser() if root else Path.home() / ".resuskill"
@@ -62,7 +88,7 @@ def write_json(path: Path, data) -> None:
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2, ensure_ascii=False)
+            json.dump(data, fh, indent=2, ensure_ascii=False, allow_nan=False)
             fh.write("\n")
         os.replace(tmp, path)
     except BaseException:
@@ -88,9 +114,9 @@ def load_input(path_arg: str):
     """Load agent-supplied JSON from a file path, or from stdin when the path is '-'."""
     try:
         if path_arg == "-":
-            return json.loads(_read_stdin())
+            return json.loads(_read_stdin(), object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
         with open(Path(path_arg).expanduser(), encoding="utf-8-sig") as fh:
-            return json.load(fh)
+            return json.load(fh, object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
     except FileNotFoundError as exc:
         raise ResuError(f"Input file not found: {path_arg}") from exc
     except json.JSONDecodeError as exc:

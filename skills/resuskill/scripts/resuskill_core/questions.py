@@ -16,36 +16,61 @@ _SENSITIVE = re.compile(
     r"disabilit\w*|disabled|sexual orientation|lgbtq?\w*|transgender|religio\w*|marital|date of birth|"
     r"age|how old|criminal|convicted|conviction|felony|misdemeanou?r|background check|salary|"
     r"compensation|pay expectations?|desired pay|expected pay|current pay|attest\w*|certify that|"
-    r"acknowledge|declaration|signature|sign here|agree to|consent)\b"
+    r"acknowledge|declaration|signature|sign here|agree to|consent|"
+    r"citizen\w*|nationality|national origin|country of (?:birth|origin)|place of birth|"
+    r"(?:the age of|aged) \d{2}|\d{2} years old|(?:1[6-9]|2[01]) (?:or|and) (?:older|over|above)|"
+    r"(?:over|under|at least|older than|younger than) (?:1[6-9]|2[01])(?! \w)|"
+    r"clearance|terminated|fired|dismissed|arrest\w*|"
+    r"drug (?:test|screen)\w*|medical condition|health condition|pregnan\w*|caste)\b"
 )
 _SPONSOR = re.compile(r"\b(sponsor\w*|visa|h-?1b|work permit)\b")
 _AUTH = re.compile(
     r"(authori[sz]ed to work|work authori[sz]ation|eligible to work|right to work|"
     r"legally (?:able|permitted|allowed|entitled) to work)"
 )
+_AUTH_PROMPT = re.compile(
+    r"are you (?:legally )?(?:authori[sz]ed|eligible|able|permitted|allowed|entitled) to work"
+    r"(?: (?:in .+|for any employer))?"
+)
+_SPONSOR_PROMPT = re.compile(
+    r"(?:will|do) you (?:now or in the future )?(?:require|need) "
+    r"(?:visa |employment )?sponsorship(?: (?:now or in the future|to work in .+|in .+))?"
+)
+# Match entire field labels; a keyword inside a different question is not a field.
 _FACTUAL = [
-    ("name", re.compile(r"\b(full name|first name|last name|legal name|your name|preferred name)\b")),
-    ("email", re.compile(r"\be-?mail\b")),
-    ("phone", re.compile(r"\b(phone|mobile|telephone)\b")),
-    ("linkedin", re.compile(r"\blinkedin\b")),
-    ("github", re.compile(r"\bgithub\b")),
-    ("portfolio", re.compile(r"\b(portfolio|personal website|website)\b")),
-    ("graduation_date", re.compile(r"\bgraduat\w*\b")),
-    ("start_date", re.compile(r"\b(start date|available to start|earliest start|when can you start|availability)\b")),
-    ("gpa", re.compile(r"\b(gpa|grade point)\b")),
-    ("major", re.compile(r"\b(major|field of study|area of study)\b")),
-    ("degree", re.compile(r"\bdegree\b")),
-    ("school", re.compile(r"\b(school|university|college|institution)\b")),
-    ("location", re.compile(r"\b(where are you (?:currently )?(?:located|based)|current location|city|location)\b")),
+    ("name", r"(?:full |legal )?name"),
+    ("email", r"e-?mail(?: address)?"),
+    ("phone", r"(?:phone|mobile|telephone)(?: number)?"),
+    ("linkedin", r"linkedin(?: (?:url|profile|link))?"),
+    ("github", r"github(?: (?:url|profile|link))?"),
+    ("portfolio", r"(?:portfolio|personal website|website)(?: (?:url|link))?"),
+    ("graduation_date", r"(?:expected )?graduation date"),
+    ("start_date", r"(?:earliest )?start date"),
+    ("gpa", r"(?:gpa|grade point average)"),
+    ("major", r"(?:major|field of study|area of study)"),
+    ("location", r"current location"),
 ]
 _RELOCATE = re.compile(r"\breloca\w*\b")
+# Deliberately small allow-list. Unrecognised prompts go to the user, including
+# arbitrary "what/how/why/describe" questions and compound questions.
 _OPEN = re.compile(
-    r"^(why|what|how|describe|tell us|explain|share|walk us|give an example|please describe)\b|"
-    r"\bwhy\b|tell us about|describe|cover letter|anything else|interest(?:s|ed)? you"
+    r"(?:why (?:are you interested in|do you want) (?:this|the) (?:role|position|job|internship)|"
+    r"why do you want to work (?:here|with us|for us)|"
+    r"what interests you about (?:this|the) (?:role|position|job)|"
+    r"(?:please )?(?:describe|tell us about) (?:a|an|your) "
+    r"(?:relevant |technical |recent |most challenging )?(?:project|work experience|technical challenge)|"
+    r"(?:please )?(?:write|provide) a cover letter|cover letter)"
 )
-# Matched as whole words after reducing the question to lowercase words ("U.S." -> "u s").
+
+
+def _prompt(text: str) -> str:
+    return norm_text(text).rstrip("?.:! ")
+
+
+# Match the entire location clause after "in", so the pronoun "us" elsewhere
+# never selects the US and ambiguous/unknown country wording stays unanswered.
 _COUNTRIES = {
-    "US": ("united states", "u s", "us", "usa", "america"),
+    "US": ("united states", "u s", "usa", "america"),
     "CA": ("canada",),
     "GB": ("united kingdom", "uk", "britain", "england"),
     "IN": ("india",),
@@ -62,33 +87,45 @@ def classify(text: str) -> tuple[str, str | None]:
     q = norm_text(text)
     if _SENSITIVE.search(q):
         return SENSITIVE, None
-    if _SPONSOR.search(q) and re.search(r"\b(require|need|will you|do you)\b", q):
-        return SENSITIVE_FACTUAL, "sponsorship"
+    prompt = _prompt(text)
     if _AUTH.search(q):
-        return SENSITIVE_FACTUAL, "authorization"
+        return (SENSITIVE_FACTUAL, "authorization") if _AUTH_PROMPT.fullmatch(prompt) else (SENSITIVE, None)
     if _SPONSOR.search(q):
-        return SENSITIVE_FACTUAL, "sponsorship"
+        return (SENSITIVE_FACTUAL, "sponsorship") if _SPONSOR_PROMPT.fullmatch(prompt) else (SENSITIVE, None)
     if _RELOCATE.search(q):
         return UNKNOWN, None
-    for key, regex in _FACTUAL:
-        if regex.search(q):
+    for key, pattern in _FACTUAL:
+        if re.fullmatch(r"(?:(?:what is |please (?:provide|enter) )?(?:your )?)" + pattern, prompt):
             return FACTUAL, key
-    if _OPEN.search(q):
+    if prompt in ("when can you start", "when are you available to start"):
+        return FACTUAL, "start_date"
+    if prompt in ("where are you located", "where are you currently located", "where are you based"):
+        return FACTUAL, "location"
+    if _OPEN.fullmatch(prompt):
         return OPEN, None
     return UNKNOWN, None
 
 
-_NAMED_PLACE = re.compile(r"\bin\s+(?:the\s+)?[A-Z]")
+def draft_refusal(text: str) -> str | None:
+    """Why the agent may not draft an answer to this question, or None when it may."""
+    detected, _ = classify(text)
+    if detected in (SENSITIVE, SENSITIVE_FACTUAL):
+        return f"it was detected as {detected}"
+    if detected != OPEN:
+        return "it is not a recognised open writing prompt; ask the user for their answer"
+    return None
 
 
 def _country(question: str, prof: dict) -> dict | None:
     records = prof.get("authorization") or []
-    words = " " + " ".join(re.findall(r"[a-z0-9]+", norm_text(question))) + " "
-    for code, names in _COUNTRIES.items():
-        if any(f" {name} " in words for name in names):
-            return next((r for r in records if r["country"] == code), {"country": code})
-    if _NAMED_PLACE.search(question):
-        return None  # names a place we cannot map; never answer it from another country's record
+    prompt = _prompt(question)
+    places = re.findall(r"\bin\s+(?:the\s+)?(.+)", prompt)
+    if places and places[0] != "future":
+        place = " ".join(re.findall(r"[a-z0-9]+", places[0]))
+        for code, names in _COUNTRIES.items():
+            if place in names or (code == "US" and place == "us"):
+                return next((r for r in records if r["country"] == code), {"country": code})
+        return None  # includes lowercase unknown places and compound country questions
     return records[0] if len(records) == 1 else None
 
 

@@ -218,11 +218,23 @@ def review_html(job: dict, prof: dict, pkg: dict, proposal: dict | None) -> str:
             f"<span class='excerpt'>“{_e(r['excerpt'])}”</span></td><td>{_e(r['basis'])}{'<br>' + evidence if evidence else ''}</td></tr>"
         )
     answers = package_mod.resolved(job, prof, pkg)["answers"]
-    answer_rows = "".join(
-        f"<tr><td>{_e(a['id'])}{' *' if a['required'] else ''}</td><td>{_e(a['question'])}</td>"
-        f"<td><span class='pill {'met' if a['resolved'] else 'unknown'}'>{_e(a['label'])}</span><br>{_e(a['text'])}</td></tr>"
-        for a in answers
-    ) or "<tr><td colspan=3 class='meta'>No questions added.</td></tr>"
+    answer_rows = []
+    for a in answers:
+        saved = pkg["answers"].get(a["id"]) or {}
+        pending_answer = pkg["answer_proposals"].get(a["id"])
+        shown = saved or pending_answer or {}
+        cited = shown.get("sources") or []
+        evidence = f"<p class='meta'>Sources: {_e(validate.originals(prof, cited))}</p>" if cited else ""
+        draft = ""
+        if saved and pending_answer:
+            draft_sources = validate.originals(prof, pending_answer.get("sources") or [])
+            draft = (f"<p><b>Replacement draft (pending review)</b><br>{_e(pending_answer['text'])}</p>"
+                     f"<p class='meta'>Sources: {_e(draft_sources)}</p>")
+        answer_rows.append(
+            f"<tr><td>{_e(a['id'])}{' *' if a['required'] else ''}</td><td>{_e(a['question'])}</td>"
+            f"<td><span class='pill {'met' if a['resolved'] else 'unknown'}'>{_e(a['label'])}</span><br>"
+            f"{_e(a['text'])}{evidence}{draft}</td></tr>")
+    answer_rows = "".join(answer_rows) or "<tr><td colspan=3 class='meta'>No questions added.</td></tr>"
     pending = proposal["proposal"] if proposal else None
     body = f"""
 <main>

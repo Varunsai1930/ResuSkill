@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from . import profile as profile_mod
+from . import input_schema
 from .skills import canon, display, find_terms
 from .util import ResuError, norm_text
 
@@ -105,6 +106,7 @@ def validate_proposal(prof: dict, job: dict, proposal) -> tuple[dict, list[str]]
     """Validate a resume proposal. Returns (clean proposal, warnings); raises on errors."""
     if not isinstance(proposal, dict):
         raise ResuError("Proposal must be a JSON object")
+    input_schema.check(proposal, input_schema.RESUME, "proposal")
     sources = profile_mod.sources(prof)
     extra = detection_terms(prof, job)
     profile_skills = profile_mod.skill_keys(prof)
@@ -113,18 +115,21 @@ def validate_proposal(prof: dict, job: dict, proposal) -> tuple[dict, list[str]]
     clean: dict = {}
 
     summary = proposal.get("summary")
-    if summary:
+    if summary is not None:
         if isinstance(summary, str):
             summary = {"text": summary, "sources": []}
         text = str(summary.get("text", "")).strip()
         cited = _sources_list(summary.get("sources"))
+        if not text:
+            errors.append("summary: text must not be empty")
         missing = [s for s in cited if s not in sources]
         if not cited:
             errors.append("summary: cite at least one profile source")
         if missing:
             errors.append(f"summary: unknown sources {', '.join(missing)}")
         else:
-            for problem in claim_problems(text, [sources[s]["text"] for s in cited], profile_skills, extra):
+            allowed = {canon(t) for s in cited for t in sources[s].get("technologies", [])}
+            for problem in claim_problems(text, [sources[s]["text"] for s in cited], allowed, extra):
                 errors.append(f"summary: {problem}")
         clean["summary"] = {"text": text, "sources": cited}
 
@@ -170,6 +175,9 @@ def validate_proposal(prof: dict, job: dict, proposal) -> tuple[dict, list[str]]
                 if foreign:
                     errors.append(f"{b_where}: sources {', '.join(foreign)} belong to a different entry than {entry_id}")
                     continue
+                if any(sources[s]["kind"] != "bullet" for s in cited):
+                    errors.append(f"{b_where}: cite source bullet IDs, not entry IDs")
+                    continue
                 for problem in claim_problems(text, [sources[s]["text"] for s in cited], entry_tech, extra):
                     errors.append(f"{b_where}: {problem} — {text[:70]!r}")
                 if len(text) > 350:
@@ -214,6 +222,8 @@ def validate_proposal(prof: dict, job: dict, proposal) -> tuple[dict, list[str]]
 
     if not clean.get("experience") and not clean.get("projects"):
         warnings.append("Proposal includes no experience or projects")
+    if not any(clean.get(key) for key in ("summary", "experience", "projects", "education", "certifications", "skills")):
+        errors.append("Proposal has no resume content; select supported profile entries or skills")
     if errors:
         raise ResuError("Proposal rejected; nothing was stored. Fix these and propose again.", errors)
     return clean, warnings
@@ -234,14 +244,16 @@ def validate_answer(prof: dict, job: dict, text: str, cited: list[str], limit: i
     errors = []
     if not text.strip():
         errors.append("empty answer")
+    if not cited:
+        errors.append("cite at least one profile source; ask the user if evidence is missing")
     bad = [s for s in cited if s not in sources]
     if bad:
         errors.append(f"unknown sources {', '.join(bad)}")
     else:
         problems = claim_problems(
             text,
-            [sources[s]["text"] for s in cited] + [prof.get("summary") or ""],
-            profile_mod.skill_keys(prof),
+            [sources[s]["text"] for s in cited],
+            {canon(t) for s in cited for t in sources[s].get("technologies", [])},
             detection_terms(prof, job),
         )
         errors.extend(problems)

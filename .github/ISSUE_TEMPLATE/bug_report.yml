@@ -1,0 +1,27 @@
+name: Bug report
+description: Report a reproducible ResuSkill problem using fictional or redacted data.
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste your real profile, contact details, salary, authorization records, credentials or unredacted agent transcripts. Replace them with a minimal fictional example.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Claude Code or Codex version, model, and ResuSkill commit/version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and fictional input
+      description: Include the command or prompt and the smallest input that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual result
+      description: Include relevant error messages, exit status and whether data changed.
+    validations:
+      required: true

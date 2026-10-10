@@ -120,6 +120,15 @@ class AuthorizationQuestionTests(unittest.TestCase):
         self.assertEqual(self.value("Are you authorized to work in the U.S.?"), "Yes")
         self.assertEqual(self.value("Are you legally authorized to work for any employer?"), "Yes")
 
+    def test_pronoun_us_is_not_the_united_states(self):
+        prof = {"authorization": [{"country": "US", "authorized": True, "requires_sponsorship": False},
+                                  {"country": "IN", "authorized": False, "requires_sponsorship": True}]}
+        sponsorship = lambda text: questions.factual_value("sponsorship", text, prof)
+        self.assertEqual(sponsorship("Will you require us to sponsor a visa to work in India?"), "Yes")
+        self.assertEqual(sponsorship("Will you require sponsorship to work in the US?"), "No")
+        self.assertIsNone(sponsorship("Will you require us to sponsor you?"))  # two records, no country named
+        self.assertIsNone(sponsorship("Will you require sponsorship in the US or India?"))
+
 
 class SensitiveCategoryTests(IsolatedHome):
     def test_sensitive_question_cannot_be_made_open(self):
@@ -133,6 +142,38 @@ class SensitiveCategoryTests(IsolatedHome):
         with self.assertRaises(ResuError):
             package.set_category(job_id, "q2", "factual")
         self.assertEqual(package.set_category(job_id, "q2", "sensitive")["category"], "sensitive")
+
+    def test_personal_yes_no_questions_never_get_ai_drafts(self):
+        job_id = jobs.add("Co", "Eng", "Need Python.")["id"]
+        for text in ("Are you a U.S. citizen?", "What is your nationality?", "Are you 18 or older?",
+                     "Do you hold an active security clearance?", "Have you ever been terminated from a job?"):
+            self.assertEqual(questions.classify(text), ("sensitive", None), text)
+        question = package.add_question(job_id, "Are you willing to relocate?", True, None, "chars", None)
+        with self.assertRaises(ResuError):
+            package.set_category(job_id, question["id"], "open")
+        with self.assertRaises(ResuError):
+            package.add_question(job_id, "Do you have a car?", True, None, "chars", "open")
+        with self.assertRaises(ResuError):
+            package.add_question(job_id, "Additional information", False, None, "chars", "open")
+
+
+class StaleAnswerTests(IsolatedHome):
+    def test_package_check_revalidates_accepted_ai_answers(self):
+        job_id = self.seed()
+        package.propose_resume(job_id, {"projects": [{"entry": "proj-1", "bullets": [
+            {"text": "Created a Python chat bot that tracks team tasks in SQLite", "sources": ["proj-1-b1"]}]}]})
+        package.accept_resume(job_id)
+        package.add_question(job_id, "Why do you want this role?", True, None, "chars", None)
+        package.propose_answers(job_id, [{"question_id": "q1", "text": "I built an API used by 1,200 people.", "sources": ["exp-1-b1"]}])
+        package.accept_answers(job_id, [])
+        self.assertEqual(package.check(job_id)[0], [])
+        prof = profile.load()
+        prof["experience"][0]["bullets"] = [b for b in prof["experience"][0]["bullets"] if b["id"] != "exp-1-b1"]
+        profile.save(prof)
+        blockers = package.check(job_id)[0]
+        self.assertTrue(any(b.startswith("q1: accepted AI answer no longer validates") for b in blockers), blockers)
+        with self.assertRaises(ResuError):
+            package.approve(job_id)
 
 
 class RenderStaleTests(IsolatedHome):

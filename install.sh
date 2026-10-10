@@ -19,10 +19,12 @@ for arg in "$@"; do
 done
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(claude codex)
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "Warning: python3 not found. ResuSkill needs Python 3.9+." >&2
+if ! command -v python3 >/dev/null 2>&1 || ! python3 "$SRC/scripts/resuskill.py" --version; then
+  echo "Install Python 3.9+ and retry. No skill was installed." >&2
+  exit 1
 fi
 
+failed=0
 for target in "${TARGETS[@]}"; do
   case "$target" in
     claude) dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills" ;;
@@ -36,15 +38,20 @@ for target in "${TARGETS[@]}"; do
       continue
     fi
     echo "✗ $target: $dest already exists; remove it first to reinstall" >&2
+    failed=1
     continue
   fi
   if [ "$MODE" = copy ]; then
-    cp -R "$SRC" "$dest"
+    python3 - "$SRC" "$dest" <<'PY'
+import shutil
+import sys
+shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
+PY
   else
     ln -s "$SRC" "$dest"
   fi
   echo "✓ $target: installed at $dest ($MODE)"
 done
 
-python3 "$SRC/scripts/resuskill.py" --version >/dev/null 2>&1 && echo "✓ CLI runs: $(python3 "$SRC/scripts/resuskill.py" --version)"
 echo "Restart Claude Code / Codex, then ask: \"Use resuskill to set up my profile\"."
+exit "$failed"

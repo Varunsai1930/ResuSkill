@@ -1,6 +1,6 @@
 # JSON shapes
 
-Dates are `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; ongoing roles use `"present"`. Unknown values are `null` or empty, never guessed.
+Dates are real calendar dates in `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; ongoing roles use `"present"`. Unknown optional values are `null` or empty, never guessed. Wrong JSON shapes, unknown fields and duplicate keys are rejected with field paths. Lists must contain the documented types; numeric `0`/`1` are not booleans.
 
 ## Profile (`profile diff/save`)
 
@@ -27,7 +27,7 @@ Start from `profile show --json` when editing so `id` fields are kept. New entri
 }
 ```
 
-Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are `true`, `false` or `null` (unknown). Source IDs for citations: `summary`, entry IDs (`exp-1`), bullet IDs (`exp-1-b2`), certification IDs (`cert-1`).
+Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are `true`, `false` or `null` (unknown); each country appears once. Source IDs for citations: `summary`, entry IDs (`exp-1`), bullet IDs (`exp-1-b2`), certification IDs (`cert-1`), and explicit profile skills (`skill:python`, `skill:sql`, using the canonical lowercase skill name). Resume bullets must cite bullet IDs.
 
 ## Requirements (`job requirements`)
 
@@ -80,4 +80,8 @@ Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are
 ]
 ```
 
-Only **open** questions accept drafts. Numbers and technologies must come from the cited sources; skills listed in the profile may be mentioned. `bank_id` is optional and records reuse of a bank answer.
+Only **open**, allow-listed writing prompts accept drafts. Every draft needs non-empty text and at least one source. Numbers, technologies and credentials must come from those sources (including their entry technologies); the profile summary is not included implicitly. Cite `skill:python` to mention that explicit profile skill. Duplicate `question_id` values are rejected. `bank_id` is optional and records reuse, but a bank ID alone is not evidence.
+
+## Stored data compatibility
+
+This release retains schema version 1. Existing v1 profiles and jobs remain readable. Unsupported schema versions are refused before writes; never relabel a newer file as v1. Back up the data directory before upgrading. Future schema changes need explicit, tested migrations that preserve originals. Approvals from older validation policies become stale and require review; legacy evidence/overrides may also require reconfirmation.

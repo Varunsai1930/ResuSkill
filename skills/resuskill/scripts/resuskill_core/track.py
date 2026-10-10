@@ -42,6 +42,9 @@ def snapshot(job_id: str) -> str:
             f"Package is {state.upper()}. Record Applied only for a current approved package: "
             "run `package check`, fix blockers, then `package approve`."
         )
+    blockers, _ = package_mod.check(job_id)
+    if blockers:
+        raise ResuError("Approved package no longer passes validation; review it again.", blockers)
     outputs = render.render(job_id)
     name = stamp()
     folder = store.job_dir(job_id) / "snapshots" / name

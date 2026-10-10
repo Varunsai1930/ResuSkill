@@ -284,6 +284,7 @@ def cmd_package(args) -> None:
         text += f"Blockers:\n{bullets(blockers)}\n" if blockers else "No blockers: ready for the user to approve.\n"
         text += f"Warnings:\n{bullets(warnings)}" if warnings else ""
         out({"state": state, "blockers": blockers, "warnings": warnings}, args.json, text.rstrip())
+        return 1 if blockers else 0
     elif args.action == "approve":
         pkg = package_mod.approve(args.job)
         print(f"Package approved (hash {pkg['approval']['hash']}). This does not mark it Applied.")
@@ -318,6 +319,13 @@ def cmd_status(args) -> None:
     out(info, args.json, "\n".join(f"{k}: {v}" for k, v in info.items()))
 
 
+def cmd_demo(args) -> None:
+    from .demo import create
+
+    result = create(args.output)
+    out(result, args.json, "\n".join(f"{k}: {v}" for k, v in result.items()))
+
+
 # ---------------------------------------------------------------- parser
 
 def build_parser() -> argparse.ArgumentParser:
@@ -329,6 +337,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("status", parents=[common], help="data directory, profile revision, job count")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("demo", parents=[common], help="create a fictional draft in a separate directory")
+    p.add_argument("--output", help="new directory (defaults to a fresh temporary directory)")
+    p.set_defaults(func=cmd_demo)
 
     p = sub.add_parser("profile", help="canonical candidate profile")
     ps = p.add_subparsers(dest="action", required=True)
@@ -478,10 +490,13 @@ def main(argv=None) -> int:
     if not hasattr(args, "json"):
         args.json = False
     try:
-        args.func(args)
+        result = args.func(args)
     except ResuError as exc:
         print(f"error: {exc}", file=sys.stderr)
         for detail in exc.details:
             print(f"  - {detail}", file=sys.stderr)
         return 1
-    return 0
+    except (OSError, UnicodeError) as exc:
+        print(f"error: could not read or write the requested file: {exc}", file=sys.stderr)
+        return 1
+    return result if isinstance(result, int) else 0
