@@ -19,7 +19,7 @@ for arg in "$@"; do
 done
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(claude codex)
 
-if ! command -v python3 >/dev/null 2>&1 || ! python3 "$SRC/scripts/resuskill.py" --version; then
+if ! command -v python3 >/dev/null 2>&1 || ! python3 "$SRC/scripts/resuskill.py" --version >/dev/null; then
   echo "Install Python 3.9+ and retry. No skill was installed." >&2
   exit 1
 fi

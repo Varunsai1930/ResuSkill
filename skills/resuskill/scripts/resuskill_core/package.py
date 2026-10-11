@@ -9,7 +9,7 @@ from __future__ import annotations
 from . import jobs as jobs_mod
 from . import profile as profile_mod
 from . import questions as q_mod
-from . import store, validate, input_schema
+from . import SCHEMA_VERSION, store, validate, input_schema
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
@@ -22,20 +22,18 @@ def _path(job_id: str):
 
 def load(job_id: str) -> dict:
     data = store.read_json(_path(job_id), default=None)
-    if data is not None:
-        store.check_version(data, "package")
-        return data
-    return {
-        "resume": None,
-        "resume_accepted_at": None,
-        "answers": {},
-        "answer_proposals": {},
-        "approval": None,
-    }
+    if data is None:
+        data = {}
+    store.check_version(data, "package")
+    # Fill missing keys so an empty or partial file reads as an empty draft.
+    for key, value in (("resume", None), ("resume_accepted_at", None), ("answers", {}),
+                       ("answer_proposals", {}), ("approval", None)):
+        data.setdefault(key, value)
+    return data
 
 
 def save(job_id: str, pkg: dict, content_changed: bool = True) -> None:
-    pkg["schema_version"] = 1
+    pkg["schema_version"] = SCHEMA_VERSION
     if content_changed:
         pkg["approval"] = None
     pkg["updated_at"] = now_iso()
@@ -97,6 +95,21 @@ def _question(job: dict, qid: str) -> dict:
         if question["id"] == qid:
             return question
     raise ResuError(f"Job {job['id']} has no question {qid!r}")
+
+
+def _draft_refusal(question: dict) -> str | None:
+    """Why this stored question may not carry an AI draft, or None when it may.
+
+    Rechecks the text so questions stored before a detection rule existed are still refused."""
+    if question["category"] != q_mod.OPEN:
+        return f"only open questions accept AI drafts (this one is {question['category']})"
+    return q_mod.draft_refusal(question["text"])
+
+
+def _mapping_current(question: dict) -> bool:
+    """Whether the question still maps to the profile field it was stored with."""
+    detected, key = q_mod.classify(question["text"])
+    return detected in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) and key == question["factual_key"]
 
 
 def _check_category_change(text: str, detected: str, key: str | None, category: str) -> None:
@@ -193,21 +206,19 @@ def propose_answers(job_id: str, drafts, model: str = "") -> list[str]:
     pkg = load(job_id)
     errors: list[str] = []
     staged = {}
+    seen: set[str] = set()
     for index, draft in enumerate(drafts):
         qid = str((draft or {}).get("question_id", ""))
-        if qid in staged:
+        if qid in seen:
             errors.append(f"answers[{index}]: duplicate question_id {qid}")
             continue
+        seen.add(qid)
         try:
             question = _question(job, qid)
         except ResuError as exc:
             errors.append(f"answers[{index}]: {exc}")
             continue
-        if question["category"] != q_mod.OPEN:
-            errors.append(f"{qid}: only open questions get AI drafts (this one is {question['category']})")
-            continue
-        # Rechecked here so questions stored before a detection rule existed are still refused.
-        refusal = q_mod.draft_refusal(question["text"])
+        refusal = _draft_refusal(question)
         if refusal:
             errors.append(f"{qid}: no AI drafts because {refusal}; the user answers it with `answers set`")
             continue
@@ -235,8 +246,7 @@ def accept_answers(job_id: str, qids: list[str]) -> list[str]:
         draft = pkg["answer_proposals"].get(qid)
         if not draft:
             raise ResuError(f"{qid} has no pending draft")
-        refusal = q_mod.draft_refusal(question["text"])
-        if question["category"] != q_mod.OPEN or refusal:
+        if _draft_refusal(question):
             raise ResuError(f"{qid}: this question cannot accept an AI draft; use `answers set` for the user's answer")
         problems = validate.validate_answer(prof, job, draft["text"], draft["sources"], question.get("limit"), question.get("limit_unit", "chars"))
         if problems:
@@ -277,8 +287,7 @@ def confirm_answer(job_id: str, qid: str) -> dict:
     question = _question(job, qid)
     if question["category"] not in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL):
         raise ResuError(f"{qid} is {question['category']}; only profile-backed answers can be confirmed")
-    detected, key = q_mod.classify(question["text"])
-    if detected not in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) or key != question["factual_key"]:
+    if not _mapping_current(question):
         raise ResuError(f"{qid}: this older question no longer maps to a profile field; use `answers set` for the user's answer")
     prof = profile_mod.load()
     value = q_mod.factual_value(question["factual_key"], question["text"], prof)
@@ -296,7 +305,7 @@ def bank_save(job_id: str, qid: str) -> dict:
     answer = load(job_id)["answers"].get(qid)
     if not answer or answer.get("skipped"):
         raise ResuError(f"{qid} has no accepted answer to save")
-    if question["category"] != q_mod.OPEN or q_mod.draft_refusal(question["text"]):
+    if _draft_refusal(question):
         raise ResuError("Only recognised open writing prompts can enter the answer bank; sensitive and unclear answers stay with the job")
     return q_mod.bank_save(question["text"], answer["text"], f"{job_id}/{qid}")
 
@@ -325,8 +334,7 @@ def resolve_answer(question: dict, answer: dict | None, proposal: dict | None, p
     if category == q_mod.UNKNOWN:
         return {"text": "", "label": LABELS["category"], "resolved": False}
     if category in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL):
-        detected, key = q_mod.classify(question["text"])
-        if detected not in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) or key != question["factual_key"]:
+        if not _mapping_current(question):
             return {"text": "", "label": LABELS["input"], "resolved": False}
         value = q_mod.factual_value(question["factual_key"], question["text"], prof)
         if category == q_mod.SENSITIVE_FACTUAL:
@@ -337,7 +345,7 @@ def resolve_answer(question: dict, answer: dict | None, proposal: dict | None, p
             return {"text": "", "label": LABELS["missing"], "resolved": False}
         return {"text": value, "label": LABELS["profile"], "resolved": True}
     if answer:
-        if answer.get("source") == "ai_draft" and (category != q_mod.OPEN or q_mod.draft_refusal(question["text"])):
+        if answer.get("source") == "ai_draft" and _draft_refusal(question):
             return {"text": answer["text"], "label": "AI draft (no longer permitted)", "resolved": False}
         return {"text": answer["text"], "label": LABELS[answer["source"]], "resolved": True}
     if category == q_mod.SENSITIVE:
@@ -377,9 +385,7 @@ def check(job_id: str) -> tuple[list[str], list[str]]:
             # The profile may have changed since the draft was accepted.
             problems = validate.validate_answer(prof, job, answer["text"], answer["sources"],
                                                 question.get("limit"), question.get("limit_unit", "chars"))
-            refusal = q_mod.draft_refusal(question["text"])
-            if question["category"] != q_mod.OPEN:
-                problems.append("only open questions accept AI drafts")
+            refusal = _draft_refusal(question)
             if refusal:
                 problems.append(f"AI drafts are not allowed because {refusal}")
             if problems:

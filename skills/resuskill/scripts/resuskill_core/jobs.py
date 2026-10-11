@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from . import store, input_schema
+from . import SCHEMA_VERSION, store, input_schema
 from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
 
 CATEGORIES = {"skill", "education", "experience", "location", "authorization", "availability", "other"}
@@ -28,17 +28,27 @@ def load(job_id: str) -> dict:
 
 
 def save(job: dict) -> None:
-    job["schema_version"] = 1
+    job["schema_version"] = SCHEMA_VERSION
     job["updated_at"] = now_iso()
     store.write_json(store.job_dir(job["id"]) / "job.json", job)
 
 
-def list_jobs() -> list[dict]:
+def list_jobs(problems: list[tuple[str, str]] | None = None) -> list[dict]:
+    """Readable jobs, newest first. An unreadable job is reported in ``problems`` and skipped,
+    so one damaged file never hides the others."""
     jobs = []
     for path in sorted(store.jobs_dir().iterdir()):
-        data = store.read_json(path / "job.json") if path.is_dir() else None
+        if not path.is_dir():
+            continue
+        try:
+            data = store.read_json(path / "job.json")
+            if data is not None:
+                store.check_version(data, "job")
+        except ResuError as exc:
+            if problems is not None:
+                problems.append((path.name, str(exc)))
+            continue
         if data:
-            store.check_version(data, "job")
             jobs.append(data)
     return sorted(jobs, key=lambda j: j.get("created_at", ""), reverse=True)
 

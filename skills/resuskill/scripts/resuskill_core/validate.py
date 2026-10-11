@@ -116,8 +116,6 @@ def validate_proposal(prof: dict, job: dict, proposal) -> tuple[dict, list[str]]
 
     summary = proposal.get("summary")
     if summary is not None:
-        if isinstance(summary, str):
-            summary = {"text": summary, "sources": []}
         text = str(summary.get("text", "")).strip()
         cited = _sources_list(summary.get("sources"))
         if not text:

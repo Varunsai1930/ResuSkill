@@ -31,7 +31,7 @@ PROFILE = {
     "availability": nullable({"start_date": TEXT, "notes": TEXT}),
     "authorization": nullable([{"country": str, "authorized": nullable(bool),
                                 "requires_sponsorship": nullable(bool)}]),
-    "_meta": dict,  # emitted metadata is ignored on input, never trusted as counters
+    "_meta": dict,  # emitted metadata; only positive integer id_counters are read back
 }
 DRAFT_TEXT = {"text": str, "sources": [str]}
 RESUME = {

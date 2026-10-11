@@ -83,16 +83,26 @@ def add_note(job_id: str, text: str) -> dict:
 def rows() -> list[dict]:
     prof = profile_mod.load(required=False)
     table = []
-    for job in jobs_mod.list_jobs():
-        pkg = package_mod.load(job["id"])
+    problems: list[tuple[str, str]] = []
+    for job in jobs_mod.list_jobs(problems):
+        try:
+            pkg = package_mod.load(job["id"])
+            review = package_mod.review_state(job, pkg, prof)
+        except ResuError as exc:
+            problems.append((job["id"], str(exc)))
+            continue
         counts = checklist_mod.summary(checklist_mod.evaluate(job, prof)) if prof and job.get("requirements") else None
         table.append({
             "id": job["id"],
             "company": job["company"],
             "title": job["title"],
-            "review": package_mod.review_state(job, pkg, prof),
+            "review": review,
             "status": job["tracking"]["status"],
             "updated": (job["tracking"]["history"][-1]["at"] if job["tracking"].get("history") else job["created_at"])[:10],
             "checklist": counts,
         })
+    # Damaged jobs stay visible so the user can restore them.
+    for job_id, error in problems:
+        table.append({"id": job_id, "company": "", "title": "", "review": "unreadable", "status": "-",
+                      "updated": "-", "checklist": None, "error": error})
     return table

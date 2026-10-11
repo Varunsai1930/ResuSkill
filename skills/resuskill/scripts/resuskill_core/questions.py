@@ -118,9 +118,11 @@ def draft_refusal(text: str) -> str | None:
 
 def _country(question: str, prof: dict) -> dict | None:
     records = prof.get("authorization") or []
-    prompt = _prompt(question)
+    # Drop the time and employer qualifiers classify() accepts, so "in" names only the place.
+    prompt = re.sub(r"\b(?:now or )?in the future\b", " ", _prompt(question))
+    prompt = re.sub(r"\s+for any employer$", "", prompt.strip())
     places = re.findall(r"\bin\s+(?:the\s+)?(.+)", prompt)
-    if places and places[0] != "future":
+    if places:
         place = " ".join(re.findall(r"[a-z0-9]+", places[0]))
         for code, names in _COUNTRIES.items():
             if place in names or (code == "US" and place == "us"):

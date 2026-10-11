@@ -297,3 +297,46 @@ class PublicReadinessTests(IsolatedHome):
 if __name__ == "__main__":
     import unittest
     unittest.main()
+
+
+class CodeReviewRegressionTests(IsolatedHome):
+    def test_country_is_read_from_the_location_clause(self):
+        prof = {"authorization": [{"country": "US", "authorized": False, "requires_sponsorship": True},
+                                  {"country": "CA", "authorized": True, "requires_sponsorship": False}]}
+        for text, country in (("Will you now or in the future require sponsorship to work in the US?", "US"),
+                              ("Are you legally authorized to work in the United States for any employer?", "US"),
+                              ("Are you authorized to work in Canada?", "CA"),
+                              ("Will you require sponsorship now or in the future?", None),
+                              ("Will you require sponsorship to work in the US and Canada?", None)):
+            with self.subTest(text=text):
+                self.assertEqual(questions.classify(text)[0], questions.SENSITIVE_FACTUAL)
+                record = questions._country(text, prof)
+                self.assertEqual(record["country"] if record else None, country)
+
+    def test_one_damaged_job_does_not_hide_the_others(self):
+        job_id = self.seed()
+        bad = store.jobs_dir() / "broken-job"
+        bad.mkdir()
+        (bad / "job.json").write_text("[]", encoding="utf-8")
+        rows = {r["id"]: r for r in track.rows()}
+        self.assertEqual(rows["broken-job"]["review"], "unreadable")
+        self.assertIn(job_id, rows)
+
+    def test_empty_package_file_reads_as_empty_draft(self):
+        job_id = self.seed()
+        (store.job_dir(job_id) / "package.json").write_text("{}", encoding="utf-8")
+        pkg = package.load(job_id)
+        self.assertEqual((pkg["answers"], pkg["answer_proposals"], pkg["resume"]), ({}, {}, None))
+        package.check(job_id)
+
+    def test_restored_counters_never_reissue_deleted_ids(self):
+        profile.save({"contact": {"name": "A"}, "projects": [{"name": "New", "bullets": ["Built it"]}],
+                      "_meta": {"id_counters": {"proj": 5, "edu": "bogus"}}})
+        self.assertEqual(profile.load()["projects"][0]["id"], "proj-6")
+
+    def test_duplicate_question_ids_are_reported_even_when_invalid(self):
+        job_id = self.seed()
+        with self.assertRaises(ResuError) as ctx:
+            package.propose_answers(job_id, [{"question_id": "q99", "text": "A", "sources": ["summary"]},
+                                             {"question_id": "q99", "text": "B", "sources": ["summary"]}])
+        self.assertTrue(any("duplicate question_id q99" in d for d in ctx.exception.details))

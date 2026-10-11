@@ -131,6 +131,9 @@ def cmd_jobs(args) -> None:
         counts = r["checklist"]
         check = f"{counts['met']}M {counts['unmet']}U {counts['unknown']}?" if counts else "-"
         print(f"{r['id'][:34]:34} {r['company'][:18]:18} {r['title'][:26]:26} {r['review']:9} {r['status']:11} {check:16} {r['updated']}")
+    for r in table:
+        if r.get("error"):
+            print(f"warning: {r['id']}: {r['error']}", file=sys.stderr)
 
 
 def checklist_text(results: list[dict]) -> str:

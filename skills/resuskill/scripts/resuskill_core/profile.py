@@ -74,11 +74,9 @@ def load(required: bool = True) -> dict | None:
     if data is None and required:
         raise ResuError("No profile saved yet. Create one with `profile template` and `profile save`.")
     if data is not None:
-        store.check_version(data, "profile")
-        meta = data.get("_meta")
-        if not isinstance(meta, dict):
+        if not isinstance(data, dict) or not isinstance(data.get("_meta"), dict):
             raise ResuError("Stored profile has no valid metadata; restore a profile backup")
-        store.check_version(data, "profile", meta.get("schema", 1))
+        store.check_version(data, "profile", data["_meta"].get("schema", 1))
     return data
 
 
@@ -162,6 +160,13 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     prof = copy.deepcopy(data)
     prof.pop("_meta", None)
     counters = _seed_counters(current, prof)
+    # Counters only ever rise, so a restored backup never reissues a deleted entry's ID.
+    # Only positive integers are taken from input metadata.
+    input_counters = (data.get("_meta") or {}).get("id_counters")
+    if isinstance(input_counters, dict):
+        for prefix, value in input_counters.items():
+            if isinstance(prefix, str) and type(value) is int and value > 0:
+                counters[prefix] = max(counters.get(prefix, 0), value)
 
     contact = prof.get("contact") or {}
     if not isinstance(contact, dict):
