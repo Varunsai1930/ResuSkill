@@ -10,7 +10,7 @@ import re
 
 from . import profile as profile_mod
 from .skills import canon, display, find_terms
-from .util import ResuError, date_span, norm_text, today_key
+from .util import ResuError, date_key, date_span, norm_text, today_key
 
 QUERY_SKILLS = 3
 
@@ -18,7 +18,7 @@ QUERY_SKILLS = 3
 def _unique(values) -> list[str]:
     seen, result = set(), []
     for value in values:
-        text = re.sub(r"\s+", " ", str(value or "")).strip()
+        text = re.sub(r"\s+", " ", str(value or "").replace('"', " ")).strip()
         if text and norm_text(text) not in seen:
             seen.add(norm_text(text))
             result.append(text)
@@ -31,8 +31,20 @@ def _roles(prof: dict, requested: list[str]) -> tuple[list[str], str]:
     preferred = _unique((prof.get("preferences") or {}).get("roles") or [])
     if preferred:
         return preferred, "preferences"
-    titles = _unique(e.get("title") for e in prof.get("experience") or [])
+    # Most recent first: ongoing roles, then by end date, then by start date.
+    def recency(entry):
+        return (date_key(entry.get("end"), end_of_period=True) or (0, 0, 0),
+                date_key(entry.get("start")) or (0, 0, 0))
+    recent = sorted(prof.get("experience") or [], key=recency, reverse=True)
+    titles = _unique(e.get("title") for e in recent)
     return titles[:2], "experience titles" if titles else "none"
+
+
+def _city(location) -> str:
+    """The city/region part of a contact location, without street lines or postal codes."""
+    parts = [p.strip() for p in str(location or "").split(",")]
+    kept = [p for p in parts if p and not re.search(r"\d", p)]
+    return ", ".join(kept[-2:])
 
 
 def ranked_skills(prof: dict) -> list[dict]:
@@ -53,8 +65,8 @@ def ranked_skills(prof: dict) -> list[dict]:
             used = {canon(t) for t in entry.get("technologies") or []} | find_terms(text, extra)
             for key in used & counts.keys():
                 counts[key] += 1
-    order = list(names)
-    ranked = sorted((k for k in order if k not in absent), key=lambda k: (-counts[k], order.index(k)))
+    order = {k: i for i, k in enumerate(names)}
+    ranked = sorted((k for k in names if k not in absent), key=lambda k: (-counts[k], order[k]))
     return [{"name": names[k], "evidence_count": counts[k]} for k in ranked]
 
 
@@ -65,6 +77,10 @@ def _level(prof: dict) -> dict:
         return {"hint": None, "basis": "graduation date unknown; ask the user which level to search"}
     today = today_key()
     if span[0] > today:
+        spans = [date_span(e.get("end")) for e in prof.get("education") or []]
+        if any(sp and sp[1] < today for sp in spans):
+            # A further degree after a completed one (part-time master's, MBA) says nothing about level.
+            return {"hint": None, "basis": f"pursuing a degree until {grad} after a completed one; ask the user which level to search"}
         return {"hint": "student", "basis": f"expected graduation {grad}"}
     year_ago = (today[0] - 1, today[1], today[2])
     if span[1] >= year_ago:
@@ -72,19 +88,26 @@ def _level(prof: dict) -> dict:
     return {"hint": None, "basis": f"graduated {grad}; ask the user which level to search"}
 
 
-_LEVEL_TERMS = {"student": "intern OR entry level", "recent graduate": "entry level"}
+_LEVEL_TERMS = {"student": 'intern OR "entry level"', "recent graduate": '"entry level"'}
 _LEVEL_WORDS = re.compile(r"\b(intern|internship|co-?op|new grad|entry[- ]level|junior|senior|lead|principal|staff)\b", re.I)
 
 
 def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skills=None) -> dict:
+    if max_queries < 1:
+        raise ResuError("--max-queries must be at least 1")
     prof = profile_mod.load()
     prefs = prof.get("preferences") or {}
     roles, role_source = _roles(prof, requested_roles or [])
     skills = ranked_skills(prof)
     work_mode = prefs.get("work_mode")
-    places = _unique(locations or prefs.get("locations") or [(prof.get("contact") or {}).get("location")])
-    if work_mode in ("remote", "any") and "remote" not in {norm_text(p) for p in places}:
-        places.append("Remote")
+    if locations:
+        places = _unique(locations)  # the user's request: search exactly these
+    elif work_mode == "remote":
+        places = ["Remote"]
+    else:
+        places = _unique(prefs.get("locations") or [_city((prof.get("contact") or {}).get("location"))])
+        if work_mode == "any" and "remote" not in {norm_text(p) for p in places}:
+            places.append("Remote")
     level = _level(prof)
     warnings = []
     if not roles:
@@ -107,12 +130,15 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     else:
         chosen = [s["name"] for s in skills[:QUERY_SKILLS]]
     top = " ".join(chosen)
+    # Place-major order so a query cap trims places evenly instead of dropping whole roles.
     queries = []
-    for role in roles:
-        suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
-        for place in places or [""]:
-            parts = [f'"{role}"', suffix, top, place]
-            queries.append(" ".join(p for p in parts if p))
+    for place in places or [""]:
+        for role in roles:
+            suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
+            queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place) if p))
+    if len(queries) > max_queries:
+        warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
+                        "raise it or narrow roles/locations to search them")
     return {
         "roles": roles,
         "role_source": role_source,
@@ -125,6 +151,6 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         "sponsorship_needed": [a["country"] for a in prof.get("authorization") or [] if a.get("requires_sponsorship") is True],
         "authorization_unknown": [a["country"] for a in prof.get("authorization") or []
                                   if a.get("authorized") is None or a.get("requires_sponsorship") is None],
-        "queries": queries[:max(1, max_queries)],
+        "queries": queries[:max_queries],
         "warnings": warnings,
     }

@@ -40,8 +40,8 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms(["Data Analyst"], ["Dallas, TX"], query_skills=["sql", "python"])
         self.assertEqual(result["role_source"], "request")
         self.assertEqual(result["query_skills"], ["SQL", "Python"])
-        self.assertEqual(result["queries"][0], '"Data Analyst" intern OR entry level SQL Python Dallas, TX')
-        self.assertIn("Remote", result["locations"])
+        self.assertEqual(result["queries"][0], '"Data Analyst" intern OR "entry level" SQL Python Dallas, TX')
+        self.assertEqual(result["locations"], ["Dallas, TX"])
 
     def test_query_skills_must_be_confirmed(self):
         self.save()
@@ -106,6 +106,55 @@ class SearchTermsTests(IsolatedHome):
         bad = run("--skill", "Tableau")
         self.assertEqual(bad.returncode, 1)
         self.assertIn("not in profile: Tableau", bad.stderr)
+
+    def test_remote_only_searches_remote(self):
+        self.save(preferences={"roles": ["Data Analyst"], "locations": ["Austin"], "work_mode": "remote"})
+        self.assertEqual(search.terms()["locations"], ["Remote"])
+
+    def test_query_cap_keeps_every_role_and_warns(self):
+        self.save(preferences={"roles": ["Data Analyst", "BI Analyst", "Analytics Engineer"],
+                               "locations": ["Austin", "Dallas"], "work_mode": "any"})
+        result = search.terms(max_queries=4)
+        self.assertEqual(len(result["queries"]), 4)
+        for role in ("Data Analyst", "BI Analyst", "Analytics Engineer"):
+            self.assertTrue(any(f'"{role}"' in q for q in result["queries"]), role)
+        self.assertTrue(any("5 queries left out" in w for w in result["warnings"]))
+        with self.assertRaises(ResuError):
+            search.terms(max_queries=0)
+
+    def test_contact_location_fallback_drops_street_and_postal_code(self):
+        data = fixture("profile.json")
+        data["contact"]["location"] = "12 Oak St, Austin, TX 78701"
+        data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
+        profile.save(data)
+        result = search.terms()
+        self.assertEqual(result["locations"], ["Austin"])
+        self.assertNotIn("Oak", json.dumps(result))
+
+    def test_fallback_titles_are_most_recent_first(self):
+        data = fixture("profile.json")
+        data["preferences"]["roles"] = []
+        old = copy.deepcopy(data["experience"][0])
+        old.update(title="Marketing Intern", start="2019-06", end="2019-08")
+        current = copy.deepcopy(data["experience"][0])
+        current.update(organization="Later Co", title="Data Analyst", start="2025-01", end="present")
+        data["experience"] = [old, data["experience"][0], current]
+        profile.save(data)
+        self.assertEqual(search.terms()["roles"], ["Data Analyst", "Software Engineering Intern"])
+
+    def test_further_degree_after_completed_one_gives_no_level(self):
+        data = fixture("profile.json")
+        done = copy.deepcopy(data["education"][0])
+        done.update(degree="B.A.", start="2010-08", end="2014-05")
+        data["education"].append(done)
+        profile.save(data)
+        result = search.terms(["Analyst"])
+        self.assertIsNone(result["level"]["hint"])
+        self.assertNotIn("intern", result["queries"][0])
+
+    def test_quotes_in_roles_are_removed(self):
+        self.save()
+        self.assertTrue(search.terms(['Analyst "Data"'])["queries"][0].startswith('"Analyst Data" '))
 
     def test_requires_profile(self):
         with self.assertRaises(ResuError):
