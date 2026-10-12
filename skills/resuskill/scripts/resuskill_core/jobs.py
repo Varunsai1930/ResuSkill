@@ -23,18 +23,26 @@ def load(job_id: str) -> dict:
     job = store.read_json(store.job_dir(job_id) / "job.json")
     if job is None:
         raise ResuError(f"Job {job_id!r} is missing job.json")
-    _check_stored(job)
+    _check_stored(job, job_id)
     return job
 
 
-def _check_stored(job) -> None:
+# Fields every command relies on; all have been written since the first job format.
+_STORED_FIELDS = {"id": str, "company": str, "title": str, "description": str,
+                  "revision": int, "requirements": list, "tracking": dict}
+
+
+def _check_stored(job, folder: str) -> None:
     """Refuse a damaged job.json before any command reads its fields."""
     store.check_version(job, "job")
-    missing = [k for k in ("id", "company", "title", "tracking") if k not in job]
-    if not missing and not (isinstance(job["tracking"], dict) and "status" in job["tracking"]):
-        missing = ["tracking.status"]
-    if missing:
-        raise ResuError(f"Stored job is missing {', '.join(missing)}; restore a valid backup")
+    bad = [k for k, kind in _STORED_FIELDS.items() if type(job.get(k)) is not kind]
+    if not bad and not isinstance(job["tracking"].get("status"), str):
+        bad = ["tracking.status"]
+    if bad:
+        raise ResuError(f"Stored job has missing or invalid {', '.join(bad)}; restore a valid backup")
+    if job["id"] != folder:
+        raise ResuError(f"Stored job id {job['id']!r} does not match its folder {folder!r}; "
+                        "a copied folder must keep its original name or be removed")
 
 
 def save(job: dict) -> None:
@@ -54,7 +62,7 @@ def list_jobs(problems: list[tuple[str, str]] | None = None) -> list[dict]:
             data = store.read_json(path / "job.json")
             if data is None:
                 continue
-            _check_stored(data)
+            _check_stored(data, path.name)
         except ResuError as exc:
             if problems is not None:
                 problems.append((path.name, str(exc)))

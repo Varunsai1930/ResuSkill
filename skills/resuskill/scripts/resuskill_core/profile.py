@@ -289,20 +289,22 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             errors.append(f"certifications[{index}].date is not a valid date")
         certs.append((index, cert))
     # Reuse previous IDs for certifications given without one, most specific match
-    # first: exact (duplicates included), then a corrected date, then a corrected
-    # issuer. An ID supplied explicitly anywhere in the input is never taken implicitly.
+    # first: exact (duplicates included), then a corrected date, then an issuer
+    # added or removed. A different named issuer is a different credential and gets
+    # a new ID. An ID supplied explicitly anywhere in the input is never taken implicitly.
     taken = {cert["id"] for _, cert in certs if cert.get("id")}
-    previous_certs = [c for c in current.get("certifications") or [] if c.get("id") not in taken]
+    previous_keys = {c["id"]: _certification_key(c) for c in current.get("certifications") or []
+                     if c.get("id") not in taken}
     for size in (3, 2, 1):
         for _, cert in certs:
             if cert.get("id"):
                 continue
-            key = _certification_key(cert)[:size]
-            match = next((c for c in previous_certs
-                          if c["id"] not in taken and _certification_key(c)[:size] == key), None)
+            key = _certification_key(cert)
+            match = next((cid for cid, old in previous_keys.items() if cid not in taken
+                          and old[:size] == key[:size] and (size > 1 or not old[1] or not key[1])), None)
             if match:
-                cert["id"] = match["id"]
-                taken.add(match["id"])
+                cert["id"] = match
+                taken.add(match)
     for index, cert in certs:
         if not cert.get("id"):
             cert["id"] = _next_id(counters, "cert")
@@ -454,6 +456,11 @@ def save(data: dict) -> tuple[dict, list[str], list[str]]:
     prof, warnings = normalize(data, current)
     changes = diff(current, prof)
     if current and _content(current) == _content(prof):
+        # Restored allocation history matters even when resume content is unchanged.
+        # Persist it without changing the content revision or invalidating approvals.
+        if current["_meta"].get("id_counters") != prof["_meta"]["id_counters"]:
+            current["_meta"]["id_counters"] = prof["_meta"]["id_counters"]
+            store.write_json(store.profile_path(), current)
         return current, [], warnings
     if current:
         store.write_json(store.history_dir() / f"profile-r{current['_meta']['revision']}.json", current)
@@ -517,5 +524,8 @@ def skill_keys(prof: dict) -> set[str]:
 
 def graduation_date(prof: dict) -> str | None:
     dates = [e.get("graduation") or e.get("end") for e in prof.get("education") or []]
-    dates = [d for d in dates if d and d != "present"]
+    # Undated education may be the current degree. Do not substitute a past
+    # degree's date when the current expected graduation is unknown.
+    if any(not d or d == "present" for d in dates):
+        return None
     return max(dates) if dates else None

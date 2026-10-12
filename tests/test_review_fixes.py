@@ -306,6 +306,84 @@ class EncodingTests(IsolatedHome):
 
 
 class SecondReviewRegressionTests(IsolatedHome):
+    def test_numeric_suffixes_preserve_magnitude(self):
+        for value, expected in (("5k", "5000"), ("5M", "5000000"), ("1.2B", "1200000000"),
+                                ("$1.25m", "1250000"), ("5 K", "5000")):
+            with self.subTest(value=value):
+                self.assertEqual(validate.numbers(value), {expected})
+                self.assertEqual(validate.claim_problems(value, [expected], set(), ()), [])
+                self.assertTrue(validate.claim_problems(value, ["5 users"], set(), ()))
+        self.assertEqual(validate.numbers("5 modules, 2 months"), {"5", "2"})
+
+    def test_fraction_spellings_are_equivalent(self):
+        for value in ("0.5", ".5", "00.500", "halved"):
+            with self.subTest(value=value):
+                self.assertEqual(validate.numbers(value), {"0.5"})
+                self.assertEqual(validate.claim_problems(value, ["halved"], set(), ()), [])
+                self.assertEqual(validate.claim_problems("halved", [value], set(), ()), [])
+        self.assertEqual(validate.numbers("0.00 005.00 5.050"), {"0", "5", "5.05"})
+
+    def test_inflated_metric_cannot_be_proposed_or_approved(self):
+        profile.save({"contact": {"name": "A"}, "experience": [{"organization": "Co", "bullets": ["Served 5 users"]}]})
+        job_id = jobs.add("Co", "Role", "Support users")["id"]
+        jobs.set_requirements(job_id, [])
+        proposal = {"experience": [{"entry": "exp-1", "bullets": [{"text": "Served 5M users", "sources": ["exp-1-b1"]}]}]}
+        with self.assertRaises(ResuError):
+            package.propose_resume(job_id, proposal)
+        proposal["experience"][0]["bullets"][0]["text"] = "Served 5 users"
+        package.propose_resume(job_id, proposal)
+        package.accept_resume(job_id)
+        pkg = package.load(job_id)
+        pkg["resume"]["experience"][0]["bullets"][0]["text"] = "Served 5M users"
+        package.save(job_id, pkg)
+        with self.assertRaises(ResuError):
+            package.approve(job_id)
+        question = package.add_question(job_id, "Describe your work experience", True, None, "chars", None)
+        with self.assertRaises(ResuError):
+            package.propose_answers(job_id, [{"question_id": question["id"], "text": "Served 5M users", "sources": ["exp-1-b1"]}])
+
+    def test_undated_education_does_not_inherit_an_old_graduation(self):
+        job_id = self.seed()
+        data = profile.load()
+        data["education"] = [{"institution": "College", "degree": "BS", "end": "2020"},
+                             {"institution": "University", "degree": "MS", "end": "present"}]
+        for end in ("present", "", None):
+            with self.subTest(end=end):
+                data["education"][1]["end"] = end
+                saved, _, _ = profile.save(data)
+                self.assertIsNone(profile.graduation_date(saved))
+                self.assertIsNone(questions.factual_value("graduation_date", "Expected graduation date", saved))
+                self.assertEqual(checklist._graduation({"from": "2026"}, saved)[0], checklist.UNKNOWN)
+        question = package.add_question(job_id, "Expected graduation date", True, None, "chars", None)
+        answer = package.resolved(jobs.load(job_id), saved, package.load(job_id))["answers"][0]
+        self.assertFalse(answer["resolved"])
+        self.assertEqual(answer["text"], "")
+        self.assertTrue(any(question["id"] in b for b in package.check(job_id)[0]))
+        data["education"][1]["graduation"] = "2027-06"
+        saved, _, _ = profile.save(data)
+        self.assertEqual(profile.graduation_date(saved), "2027-06")
+        self.assertEqual(profile.graduation_date({"education": [{"end": "2020"}, {"end": "2022"}]}), "2022")
+
+    def test_metadata_only_restore_persists_counters_without_staling_approval(self):
+        job_id = self.seed()
+        package.propose_resume(job_id, {"skills": ["Python"]})
+        package.accept_resume(job_id)
+        package.approve(job_id)
+        data = profile.load()
+        revision = data["_meta"]["revision"]
+        data["_meta"]["id_counters"].update({"proj": 8, "exp-1-b": 9})
+        saved, changes, _ = profile.save(data)
+        self.assertEqual(saved["_meta"]["revision"], revision)
+        self.assertEqual(changes, [])
+        saved = profile.load()
+        self.assertEqual(saved["_meta"]["id_counters"]["proj"], 8)
+        self.assertEqual(package.review_state(jobs.load(job_id), package.load(job_id), saved), package.APPROVED)
+        saved["projects"].append({"name": "New project"})
+        saved["experience"][0]["bullets"].append({"text": "New accomplishment"})
+        saved, _, _ = profile.save(saved)
+        self.assertEqual(saved["projects"][-1]["id"], "proj-9")
+        self.assertEqual(saved["experience"][0]["bullets"][-1]["id"], "exp-1-b10")
+
     def test_spelled_out_and_partial_credentials_need_their_own_evidence(self):
         for claim, source in (("Project Management Professional", "CPA certification"),
                               ("Chartered Financial Analyst", "CPA"),
@@ -346,3 +424,50 @@ class SecondReviewRegressionTests(IsolatedHome):
         self.assertEqual(util.today_key(), dt.date.today().timetuple()[:3])
         self.assertEqual(util.date_span("2024-02"), ((2024, 2, 1), (2024, 2, 29)))
         self.assertIsNone(util.date_span("not a date"))
+
+
+class ThirdReviewRegressionTests(IsolatedHome):
+    def test_credentials_in_progress_do_not_support_holding_claims(self):
+        for claim, source in (("CPA with audit experience", "Pursuing CPA licensure; audit experience"),
+                              ("CISSP", "Preparing for the CISSP exam"),
+                              ("Chartered Financial Analyst", "CFA Level I candidate"),
+                              ("CFA", "Licensed CPA. Studying for the CFA.")):
+            with self.subTest(claim=claim):
+                self.assertTrue(validate.claim_problems(claim, [source], set(), ()))
+        for claim, source in (("Passed CFA Level I", "Passed Level I of the CFA Program"),
+                              ("Pursuing the CPA", "Pursuing CPA licensure"),
+                              ("CPA", "Licensed CPA. Studying for the CFA.")):
+            with self.subTest(claim=claim):
+                self.assertEqual(validate.claim_problems(claim, [source], set(), ()), [])
+
+    def test_job_files_with_wrong_types_or_ids_are_unreadable(self):
+        import json
+        import shutil
+        from resuskill_core import store, track
+
+        job_id = jobs.add("Co", "Role", "Python required")["id"]
+        good = store.job_dir(job_id)
+        shutil.copytree(good, store.jobs_dir() / "copied")
+        bad = json.loads((good / "job.json").read_text(encoding="utf-8"))
+        bad["id"], bad["company"] = "nulled", None
+        (store.jobs_dir() / "nulled").mkdir()
+        (store.jobs_dir() / "nulled" / "job.json").write_text(json.dumps(bad), encoding="utf-8")
+        rows = {r["id"]: r for r in track.rows()}
+        self.assertEqual(rows["copied"]["review"], "unreadable")
+        self.assertEqual(rows["nulled"]["review"], "unreadable")
+        self.assertNotEqual(rows[job_id]["review"], "unreadable")
+        for name in ("copied", "nulled"):
+            with self.assertRaises(ResuError):
+                jobs.load(name)
+
+    def test_different_issuer_gets_a_new_certification_id(self):
+        data = {"contact": {"name": "A"}, "certifications": [{"name": "Scrum Master", "issuer": "Scrum Alliance"}]}
+        profile.save(data)
+        data["certifications"] = [{"name": "Scrum Master", "issuer": "Scrum.org"}]
+        saved, changes, _ = profile.save(data)
+        self.assertEqual(saved["certifications"][0]["id"], "cert-2")
+        self.assertIn("- certification cert-1: Scrum Master", changes)
+        # Removing or adding an issuer corrects the same record.
+        for issuer in ("", "Scrum.org"):
+            data["certifications"] = [{"name": "Scrum Master", "issuer": issuer}]
+            self.assertEqual(profile.save(data)[0]["certifications"][0]["id"], "cert-2")

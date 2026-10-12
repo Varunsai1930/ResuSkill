@@ -8,13 +8,18 @@ These checks are a safety net, not proof of accuracy; the user still reviews mea
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 from . import profile as profile_mod
 from . import input_schema
 from .skills import canon, display, find_terms
 from .util import ResuError, norm_text
 
-_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])[$€£₹]?(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)")
+_NUMBER_RE = re.compile(
+    r"(?<![A-Za-z0-9.])[$€£₹]?(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)"
+    r"(?:[ \t]*([kmb])(?!\w))?", re.IGNORECASE
+)
+_NUMBER_SCALES = {"k": 3, "m": 6, "b": 9}
 _NUMBER_WORDS = {
     "two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7",
     "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12", "dozen": "12",
@@ -40,39 +45,64 @@ _CREDENTIALS = {
     "master's degree": r"master'?s|masters?\s+of|m\.(?:s|a|sc|eng|tech)\.?|msc|m\.?tech|meng",
     "mba": r"mba",
     "degree": r"degree",
-    # Distinct qualifications must not provide evidence for each other, whether
-    # written as an acronym or spelled out.
-    "CPA": r"cpa|certified public accountant",
-    "PMP": r"pmp|project management professional",
-    "CFA": r"cfa|chartered financial analyst",
-    "CISSP": r"cissp|certified information systems security professional",
-    "CCNA": r"ccna|cisco certified network associate",
-    # Progress toward a credential must not back a claim of holding it.
-    "CFA Level I": r"cfa level (?:i|1)",
-    "CFA Level II": r"cfa level (?:ii|2)",
-    "CFA Level III": r"cfa level (?:iii|3)",
     "charterholder": r"charter\s?holders?|cfa charter",
     "publication": r"publish(?:ed|ing)?|publications?|peer[- ]reviewed",
     "honor": r"cum laude|dean'?s list|scholarship|fellowship|valedictorian",
 }
+# Distinct qualifications must not provide evidence for each other, whether
+# written as an acronym or spelled out.
+_PROFESSIONAL = {
+    "CPA": r"cpa|certified public accountant",
+    "PMP": r"pmp|project management professional",
+    "CFA": r"cfa|chartered financial analyst",
+    "CISSP": r"cissp|certified information systems security professional",
+    "CCNA": r"cisco certified network associate|ccna",
+}
+# Wording that marks a credential as not yet held. A clause runs to the next
+# sentence break; commas do not end it, so "CPA, expected 2025" stays in progress.
+_PROGRESS_RE = re.compile(
+    r"(?<!\w)(?:pursu\w*|candidates?|candidacy|preparing|studying|working toward\w*|enrolled|"
+    r"in progress|expected|sitting for|registered for|level (?:iii|ii|i|[123]))(?!\w)"
+)
+_CFA_LEVEL_RE = re.compile(r"(?<!\w)level (iii|ii|i|[123])(?!\w)")
+_LEVELS = {"1": "I", "2": "II", "3": "III", "i": "I", "ii": "II", "iii": "III"}
+_CLAUSE_RE = re.compile(r"[^.;!?\n]+")
+
 _CREDENTIAL_RES = {name: re.compile(rf"(?<!\w)(?:{pat})(?!\w)", re.IGNORECASE) for name, pat in _CREDENTIALS.items()}
+_PROFESSIONAL_RES = {name: re.compile(rf"(?<!\w)(?:{pat})(?!\w)") for name, pat in _PROFESSIONAL.items()}
+
+
+def _number_key(raw: str, scale: int = 0) -> str:
+    value = Decimal(raw.replace(",", ""))
+    sign, digits, exponent = value.as_tuple()
+    # Shift the exponent exactly, without floating-point or context rounding.
+    normalized = format(Decimal((sign, digits, exponent + scale)), "f")
+    return normalized.rstrip("0").rstrip(".") if "." in normalized else normalized
 
 
 def numbers(text: str) -> set[str]:
     found = set()
     for match in _NUMBER_RE.finditer(text or ""):
-        raw = match.group(1).replace(",", "")
-        if "." in raw:
-            raw = raw.rstrip("0").rstrip(".") or "0"
-        found.add(raw.lstrip("0") or "0")
+        scale = _NUMBER_SCALES.get((match.group(2) or "").lower(), 0)
+        found.add(_number_key(match.group(1), scale))
     for match in _WORD_RE.finditer(text or ""):
-        found.add(_NUMBER_WORDS[match.group(1).lower()])
+        found.add(_number_key(_NUMBER_WORDS[match.group(1).lower()]))
     return found
 
 
 def credentials(text: str) -> set[str]:
     text = norm_text(text)  # unify curly apostrophes so "Master’s" matches
-    return {name for name, regex in _CREDENTIAL_RES.items() if regex.search(text)}
+    found = {name for name, regex in _CREDENTIAL_RES.items() if regex.search(text)}
+    # A professional credential counts as held only when its clause has no progress wording.
+    for clause in _CLAUSE_RE.findall(text):
+        in_progress = bool(_PROGRESS_RE.search(clause))
+        for name, regex in _PROFESSIONAL_RES.items():
+            if not regex.search(clause):
+                continue
+            found.add(f"{name} (in progress)" if in_progress else name)
+            if name == "CFA":
+                found.update(f"CFA Level {_LEVELS[level]}" for level in _CFA_LEVEL_RE.findall(clause))
+    return found
 
 
 def claim_problems(text: str, source_texts: list[str], allowed_tech: set[str], extra_terms) -> list[str]:

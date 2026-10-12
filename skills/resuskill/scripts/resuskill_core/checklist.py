@@ -65,9 +65,9 @@ def _degree(crit: dict, prof: dict) -> tuple[str, str]:
         pursuing = None
         if end == "present":
             pursuing = True
-        elif date_span(end):
+        elif span := date_span(end):
             # A year/month that spans today cannot establish either status.
-            earliest, latest = date_span(end)
+            earliest, latest = span
             if earliest > today:
                 pursuing = True
             elif latest <= today:
