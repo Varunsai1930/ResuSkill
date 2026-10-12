@@ -1,6 +1,10 @@
 # ResuSkill
 
+[![Tests](https://github.com/Varunsai1930/ResuSkill/actions/workflows/tests.yml/badge.svg)](https://github.com/Varunsai1930/ResuSkill/actions/workflows/tests.yml)
+
 An agent skill for **Claude Code** and **Codex** that turns your confirmed profile and a pasted job description into an evidence checklist, a tailored resume, reviewed answers and an application record. Deterministic checks reject detectable unsupported claims; you review the meaning before approval.
+
+**Ready for friend testing:** start with the fictional demo below, then try one real application with careful review. Agent behavior in both clients still needs the [25-case evaluation](evals/README.md) before a validated public release.
 
 ```text
 Create profile → Add job → Review requirements → Tailor resume
@@ -54,7 +58,9 @@ git clone https://github.com/Varunsai1930/ResuSkill.git
 cd ResuSkill && ./install.sh
 ```
 
-`install.sh` symlinks `skills/resuskill` into `~/.claude/skills/` and `~/.codex/skills/`. Use `./install.sh claude` or `./install.sh codex` for one tool, or add `--copy` to copy instead of symlinking. Restart the agent afterwards.
+`install.sh` symlinks `skills/resuskill` into `~/.claude/skills/` and `~/.agents/skills/` (the [documented Codex user location](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)). Use `./install.sh claude` or `./install.sh codex` for one tool, or add `--copy` to copy instead of symlinking. Keep the cloned repository in place when using symlinks. Restart the agent if the skill does not appear.
+
+For a custom or older Codex install location, set `RESUSKILL_CODEX_SKILLS_DIR` to the complete skills directory before running the installer. If you already have ResuSkill under `~/.codex/skills/`, remove that previous skill installation before installing in the new location so it is not discovered twice. Your application data in `~/.resuskill/` is separate from the installed skill.
 
 **Claude Code plugin (alternative):** inside Claude Code run `/plugin marketplace add Varunsai1930/ResuSkill`, then `/plugin install resuskill@resuskill`.
 
@@ -67,6 +73,8 @@ python3 skills/resuskill/scripts/resuskill.py demo --json
 ```
 
 Open the returned `review` and `resume` paths. The demo creates a separate temporary data directory and leaves your real profile untouched. The fictional package stays a draft, with a salary question deliberately awaiting an answer or explicit skip. To continue it, set `RESUSKILL_HOME` to the returned `data_dir` for your commands. Run `package check JOB`, resolve the question, review the files, and approve only when ready. `--output NEW_DIR` keeps the demo in a new directory you choose; existing directories are refused.
+
+Once the demo works, start a new agent chat and ask: "Use resuskill to set up my profile from this resume." If you hit a problem, [report it](https://github.com/Varunsai1930/ResuSkill/issues/new?template=bug_report.yml) with your OS, Python/client version, command and fictional or redacted input.
 
 ## Use it
 
@@ -114,7 +122,7 @@ Back up `~/.resuskill/` (or your `RESUSKILL_HOME`) before updating. Schema v1 re
 python3 -m unittest discover -s tests
 ```
 
-The CLI is `skills/resuskill/scripts/resuskill.py` (`--help` lists every command). See [PLAN.md](PLAN.md) for the design and [skills/resuskill/references](skills/resuskill/references) for the command and JSON references. A companion web app with the same workflow lives at [ResuApply](https://github.com/Varunsai1930/ResuApply).
+The CLI is `skills/resuskill/scripts/resuskill.py` (`--help` lists every command). The [command reference](skills/resuskill/references/commands.md) and [JSON schemas](skills/resuskill/references/schemas.md) describe the supported interface. Tests and evaluation cases use fictional data. A companion web app with the same workflow lives at [ResuApply](https://github.com/Varunsai1930/ResuApply).
 
 For release qualification, run the CI OS/Python matrix, copied-install smoke test and both client evaluations. Tag a version and publish its changelog only after reviewing those results. This checkout's unreleased changes are not a published GitHub release.
 

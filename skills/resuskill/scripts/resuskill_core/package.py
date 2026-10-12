@@ -13,7 +13,7 @@ from . import SCHEMA_VERSION, store, validate, input_schema
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
-VALIDATION_VERSION = 4
+VALIDATION_VERSION = 5
 
 
 def _path(job_id: str):
@@ -29,7 +29,44 @@ def load(job_id: str) -> dict:
     for key, value in (("resume", None), ("resume_accepted_at", None), ("answers", {}),
                        ("answer_proposals", {}), ("approval", None)):
         data.setdefault(key, value)
+    _check_stored(data)
     return data
+
+
+def _check_stored(pkg: dict) -> None:
+    """Report damaged package fields before commands or the tracker use them."""
+    problems = []
+    if pkg["resume"] is not None and not isinstance(pkg["resume"], dict):
+        problems.append("resume")
+    for name in ("answers", "answer_proposals"):
+        records = pkg[name]
+        if not isinstance(records, dict):
+            problems.append(name)
+            continue
+        for qid, record in records.items():
+            where = f"{name}.{qid}"
+            if not isinstance(record, dict) or not isinstance(record.get("text"), str):
+                problems.append(where)
+                continue
+            if name == "answers" and record.get("source") not in ("user", "profile", "ai_draft"):
+                problems.append(f"{where}.source")
+            if name == "answer_proposals" or record.get("source") == "ai_draft":
+                cited = record.get("sources")
+                if not isinstance(cited, list) or any(not isinstance(s, str) for s in cited):
+                    problems.append(f"{where}.sources")
+            for flag in ("skipped", "confirmed"):
+                if flag in record and type(record[flag]) is not bool:
+                    problems.append(f"{where}.{flag}")
+    approval = pkg["approval"]
+    if approval is not None:
+        if not isinstance(approval, dict):
+            problems.append("approval")
+        else:
+            for key, kind in (("profile_revision", int), ("job_revision", int), ("hash", str)):
+                if type(approval.get(key)) is not kind:
+                    problems.append(f"approval.{key}")
+    if problems:
+        raise ResuError("Stored package has missing or invalid fields; restore a valid backup.", problems)
 
 
 def save(job_id: str, pkg: dict, content_changed: bool = True) -> None:
@@ -109,7 +146,11 @@ def _draft_refusal(question: dict) -> str | None:
 def _mapping_current(question: dict) -> bool:
     """Whether the question still maps to the profile field it was stored with."""
     detected, key = q_mod.classify(question["text"])
-    return detected in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL) and key == question["factual_key"]
+    return (
+        detected in (q_mod.FACTUAL, q_mod.SENSITIVE_FACTUAL)
+        and key == question["factual_key"]
+        and (detected == q_mod.FACTUAL or question["category"] == q_mod.SENSITIVE_FACTUAL)
+    )
 
 
 def _check_category_change(text: str, detected: str, key: str | None, category: str) -> None:

@@ -51,7 +51,7 @@ Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are
 | `graduation_window` | `from`, `to` (dates; either may be omitted) |
 | `location` | `locations` (list) and/or `work_mode`: `remote` \| `hybrid` \| `onsite` |
 | `authorization` | `country` (ISO code, e.g. `US`), `sponsorship_available`: `true` \| `false` \| `null` |
-| `availability` | `start_by` and/or `start_from` (dates) |
+| `availability` | `start_from` is the earliest job start; `start_by` is the latest acceptable start (dates). A profile date means available from that date: earlier availability is compatible. If only `start_from` is given, later candidate availability stays Unknown because no latest start is known. |
 | `years_experience` | `years` (number), `area` (text). Always Unknown until evidence is confirmed |
 
 ## Resume proposal (`resume propose`)

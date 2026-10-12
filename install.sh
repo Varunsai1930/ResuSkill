@@ -2,7 +2,7 @@
 # Install the ResuSkill skill for Claude Code and/or Codex by symlinking (default) or copying.
 #   ./install.sh            install for both
 #   ./install.sh claude     Claude Code only (~/.claude/skills)
-#   ./install.sh codex      Codex only (~/.codex/skills)
+#   ./install.sh codex      Codex only (~/.agents/skills)
 #   ./install.sh --copy ... copy files instead of symlinking
 set -euo pipefail
 
@@ -28,7 +28,7 @@ failed=0
 for target in "${TARGETS[@]}"; do
   case "$target" in
     claude) dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills" ;;
-    codex) dir="${CODEX_HOME:-$HOME/.codex}/skills" ;;
+    codex) dir="${RESUSKILL_CODEX_SKILLS_DIR:-$HOME/.agents/skills}" ;;
   esac
   mkdir -p "$dir"
   dest="$dir/resuskill"

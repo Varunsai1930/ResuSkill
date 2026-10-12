@@ -173,9 +173,6 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
                 counters[prefix] = max(counters.get(prefix, 0), value)
 
     contact = prof.get("contact") or {}
-    if not isinstance(contact, dict):
-        errors.append("contact must be an object")
-        contact = {}
     contact = {k: _clean_str(contact.get(k)) for k in ("name", "email", "phone", "location")} | {
         "links": {str(k): _clean_str(v) for k, v in (contact.get("links") or {}).items() if _clean_str(v)}
     }
@@ -189,9 +186,13 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     seen_ids: set[str] = set()
     for section, prefix in ENTRY_SECTIONS.items():
         current_by_id = {e.get("id"): e for e in current.get(section) or [] if isinstance(e, dict)}
-        current_by_key = {_entry_key(section, e): e for e in current_by_id.values()}
+        current_by_key = {}
+        for entry in current_by_id.values():
+            current_by_key.setdefault(_entry_key(section, entry), []).append(entry)
+        raw_entries = _as_list(prof.get(section), section, errors)
+        explicit_ids = {_clean_str(e.get("id")) for e in raw_entries if isinstance(e, dict)} - {""}
         entries = []
-        for index, raw in enumerate(_as_list(prof.get(section), section, errors)):
+        for index, raw in enumerate(raw_entries):
             where = f"{section}[{index}]"
             if not isinstance(raw, dict):
                 errors.append(f"{where} must be an object")
@@ -212,20 +213,26 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
                     errors.append(f"{where}.id must look like {prefix}-N (got {entry_id!r})")
                 previous = current_by_id.get(entry_id)
             else:
-                previous = current_by_key.get(_entry_key(section, entry))
-                entry_id = previous["id"] if previous and previous.get("id") not in seen_ids else _next_id(counters, prefix)
+                previous = next((e for e in current_by_key.get(_entry_key(section, entry), [])
+                                 if e["id"] not in seen_ids and e["id"] not in explicit_ids), None)
+                entry_id = previous["id"] if previous else _next_id(counters, prefix)
             if entry_id in seen_ids:
                 errors.append(f"Duplicate id {entry_id}")
             seen_ids.add(entry_id)
             entry["id"] = entry_id
             entry["technologies"] = [display(_clean_str(t)) for t in _as_list(entry.get("technologies"), f"{where}.technologies", errors) if _clean_str(t)]
 
-            prev_bullets = {norm_text(b.get("text", "")): b.get("id") for b in (previous or {}).get("bullets") or [] if isinstance(b, dict)}
+            prev_bullets = {}
+            for bullet in (previous or {}).get("bullets") or []:
+                if isinstance(bullet, dict):
+                    prev_bullets.setdefault(norm_text(bullet.get("text", "")), []).append(bullet.get("id"))
+            raw_bullets = _as_list(entry.get("bullets"), f"{where}.bullets", errors)
+            explicit_bullet_ids = {_clean_str(b.get("id")) for b in raw_bullets if isinstance(b, dict)} - {""}
             # The counter is kept in _meta.id_counters so a deleted bullet's ID is never reused.
             bullet_n = max(_bullet_counter(entry_id, previous, raw), counters.get(f"{entry_id}-b", 0))
             bullets = []
             used_bullet_ids: set[str] = set()
-            for b_index, bullet in enumerate(_as_list(entry.get("bullets"), f"{where}.bullets", errors)):
+            for b_index, bullet in enumerate(raw_bullets):
                 if isinstance(bullet, str):
                     bullet = {"text": bullet}
                 if not isinstance(bullet, dict) or not _clean_str(bullet.get("text")):
@@ -233,11 +240,12 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
                     continue
                 text = _clean_str(bullet["text"])
                 bullet_id = _clean_str(bullet.get("id"))
-                if bullet_id and not bullet_id.startswith(f"{entry_id}-b"):
-                    errors.append(f"{where}.bullets[{b_index}].id {bullet_id!r} must start with {entry_id}-b")
+                if bullet_id and not re.fullmatch(rf"{re.escape(entry_id)}-b\d+", bullet_id):
+                    errors.append(f"{where}.bullets[{b_index}].id {bullet_id!r} must look like {entry_id}-bN")
                 if not bullet_id:
-                    reuse = prev_bullets.get(norm_text(text))
-                    if reuse and reuse not in used_bullet_ids:
+                    reuse = next((bid for bid in prev_bullets.get(norm_text(text), [])
+                                  if bid and bid not in used_bullet_ids and bid not in explicit_bullet_ids), None)
+                    if reuse:
                         bullet_id = reuse
                     else:
                         bullet_n += 1
@@ -347,11 +355,6 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             clean[field] = value if value in (True, False) else None
         auths.append(clean)
     prof["authorization"] = auths
-
-    known = set(TEMPLATE) | {"_meta"}
-    for key in data:
-        if key not in known:
-            warnings.append(f"Unknown top-level field {key!r} kept as-is")
 
     if errors:
         raise ResuError("Profile is invalid; nothing was saved.", errors)

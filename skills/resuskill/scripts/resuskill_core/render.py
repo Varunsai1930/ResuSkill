@@ -278,7 +278,10 @@ def stamp_path(pdf: Path) -> Path:
 def find_browser() -> str | None:
     override = os.environ.get("RESUSKILL_BROWSER")
     if override:
-        return override if Path(override).exists() or shutil.which(override) else None
+        path = Path(override).expanduser()
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path.resolve())
+        return shutil.which(override)
     candidates = []
     system = platform.system()
     if system == "Darwin":
@@ -290,18 +293,32 @@ def find_browser() -> str | None:
         ]
     elif system == "Windows":
         for root in (os.environ.get("PROGRAMFILES", ""), os.environ.get("PROGRAMFILES(X86)", ""), os.environ.get("LOCALAPPDATA", "")):
+            if not root:
+                continue
             candidates += [
                 os.path.join(root, "Google", "Chrome", "Application", "chrome.exe"),
                 os.path.join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
             ]
     for path in candidates:
-        if path and Path(path).exists():
+        if Path(path).is_file() and os.access(path, os.X_OK):
             return path
     for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge"):
         found = shutil.which(name)
         if found:
             return found
     return None
+
+
+def _pdf_complete(path: Path) -> bool:
+    """Do not deliver a file while the browser is still writing its trailer."""
+    try:
+        with path.open("rb") as stream:
+            if stream.read(5) != b"%PDF-":
+                return False
+            stream.seek(max(0, path.stat().st_size - 1024))
+            return stream.read().rstrip().endswith(b"%%EOF")
+    except FileNotFoundError:
+        return False
 
 
 def print_pdf(html_path: Path, pdf_path: Path) -> Path:
@@ -311,35 +328,40 @@ def print_pdf(html_path: Path, pdf_path: Path) -> Path:
             "No Chrome, Chromium or Edge found for PDF output. Open the HTML file in a browser and use "
             "Print → Save as PDF, or set RESUSKILL_BROWSER to a Chromium-based browser."
         )
-    if pdf_path.exists():
-        pdf_path.unlink()
-    with tempfile.TemporaryDirectory(prefix="resuskill-browser-") as profile_dir:
+    # Print beside the destination and replace it only after successful output.
+    # A failed browser run must not destroy the user's previous PDF.
+    with tempfile.TemporaryDirectory(prefix="resuskill-browser-", dir=pdf_path.resolve().parent) as temp_dir:
+        output = Path(temp_dir) / "resume.pdf"
         cmd = [
             browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             "--disable-extensions", "--disable-background-networking", "--disable-component-update",
-            "--no-pdf-header-footer", f"--user-data-dir={profile_dir}",
-            f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri(),
+            "--no-pdf-header-footer", f"--user-data-dir={Path(temp_dir) / 'profile'}",
+            f"--print-to-pdf={output}", html_path.resolve().as_uri(),
         ]
         # Output is discarded rather than captured: browser helper processes can keep
         # inherited pipes open long after the PDF is written.
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        deadline, last_size = time.monotonic() + 90, -1
-        while time.monotonic() < deadline:
-            if proc.poll() is not None:
-                break
-            size = pdf_path.stat().st_size if pdf_path.exists() else 0
-            if size and size == last_size:
-                break
-            last_size = size
-            time.sleep(0.5)
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-    if not pdf_path.exists() or pdf_path.stat().st_size == 0:
-        raise ResuError("The browser did not produce a PDF; use the browser's Save as PDF instead")
+        try:
+            deadline, last_size = time.monotonic() + 90, -1
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    break
+                size = output.stat().st_size if output.exists() else 0
+                if size and size == last_size and _pdf_complete(output):
+                    break
+                last_size = size
+                time.sleep(0.5)
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+        if not _pdf_complete(output):
+            raise ResuError("The browser did not produce a complete PDF; use the browser's Save as PDF instead")
+        os.replace(output, pdf_path)
     return pdf_path
 
 
@@ -373,8 +395,8 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> d
     outputs["resume"] = str(target)
     if want_pdf:
         pdf = folder / (pdf_name(prof) if not use_proposal else "preview.pdf")
-        stamp_path(pdf).unlink(missing_ok=True)
         outputs["pdf"] = str(print_pdf(target, pdf))
+        stamp_path(pdf).unlink(missing_ok=True)
         if not use_proposal:
             store.write_json(stamp_path(pdf), pdf_stamp(prof, resume))
     return outputs

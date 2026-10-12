@@ -77,9 +77,13 @@ def read_json(path: Path, default=None):
         return default
     try:
         with path.open(encoding="utf-8") as fh:
-            return json.load(fh)
+            return json.load(fh, object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
+    except FileNotFoundError:
+        return default
     except json.JSONDecodeError as exc:
         raise ResuError(f"Stored file is not valid JSON: {path} ({exc})") from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ResuError(f"Stored file cannot be read: {path} ({exc})") from exc
 
 
 def write_json(path: Path, data) -> None:
@@ -121,6 +125,8 @@ def load_input(path_arg: str):
         raise ResuError(f"Input file not found: {path_arg}") from exc
     except json.JSONDecodeError as exc:
         raise ResuError(f"Input is not valid JSON: {exc}") from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ResuError(f"Input file cannot be read: {path_arg} ({exc})") from exc
 
 
 def load_text(path_arg: str) -> str:
@@ -130,3 +136,5 @@ def load_text(path_arg: str) -> str:
         return Path(path_arg).expanduser().read_text(encoding="utf-8-sig")
     except FileNotFoundError as exc:
         raise ResuError(f"Input file not found: {path_arg}") from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ResuError(f"Input file cannot be read: {path_arg} ({exc})") from exc

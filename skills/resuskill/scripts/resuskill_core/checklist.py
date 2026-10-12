@@ -170,6 +170,8 @@ def _availability(crit: dict, prof: dict) -> tuple[str, str]:
             return UNMET, f"Available from {start}, after {crit['start_by']}"
         if date_key(start, end_of_period=True) > deadline:
             return UNKNOWN, f"Start date {start} is not precise enough to compare with {crit['start_by']}"
+    elif crit.get("start_from") and date_key(start, end_of_period=True) > date_key(crit["start_from"]):
+        return UNKNOWN, f"Available from {start}; job starts from {crit['start_from']} but gives no latest start date"
     return MET, f"Available from {start}"
 
 

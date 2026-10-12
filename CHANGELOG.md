@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Preserve distinct IDs for duplicate profile entries, bullets and requirements when unchanged input is saved again; reserve explicitly supplied IDs before matching implicit ones. Reject malformed bullet IDs.
+- Keep availability Unknown when a job gives only its earliest start and the candidate is available later. Reject reversed availability/graduation date windows and share their date-validation logic.
+- Prevent legacy authorization/sponsorship questions stored as ordinary factual questions from bypassing confirmation. Validation policy v5 makes earlier approvals stale.
+- Report damaged package fields and unreadable input/storage as recovery errors; apply the same duplicate-key/nonfinite-number checks to stored JSON as to incoming JSON.
+- Preserve existing PDFs and their provenance on failed exports; replace them only after a new PDF has a header and final trailer. Validate browser overrides and honor `--json` on mutation commands.
+- Install Codex skills in the current `~/.agents/skills/` location, with `RESUSKILL_CODEX_SKILLS_DIR` for custom paths. Refresh newcomer instructions, remove the obsolete implementation plan, and remove unreachable profile/factual-answer branches and unnecessary education sorting.
 - Restrict AI answers to a small allow-list of writing prompts; unclear questions accept the user's answer directly. Use complete field labels for automatic factual answers.
 - Validate JSON shapes before writes, with field paths; reject duplicate keys, non-finite numbers, duplicate answer IDs and invalid booleans.
 - Require explicit sources for AI answers, and bullet sources for resume bullets. Do not implicitly use the entire profile summary as evidence.

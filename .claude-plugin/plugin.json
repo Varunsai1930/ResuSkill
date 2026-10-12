@@ -1,7 +1,7 @@
 {
   "name": "resuskill",
   "version": "0.1.0",
-  "description": "Evidence-backed job application copilot: checklist matching, tailored resumes and answers from verified facts, approval and tracking. Never invents experience or submits applications.",
+  "description": "Prepare job application checklists, tailored resumes and reviewed answers from confirmed facts, with deterministic claim checks and manual submission.",
   "author": {
     "name": "Varunsai1930",
     "url": "https://github.com/Varunsai1930"

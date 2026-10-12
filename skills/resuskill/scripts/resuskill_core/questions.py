@@ -139,8 +139,6 @@ def factual_value(key: str, question: str, prof: dict) -> str | None:
     """The profile's value for a factual question, or None when missing."""
     contact = prof.get("contact") or {}
     links = contact.get("links") or {}
-    education = sorted(prof.get("education") or [], key=lambda e: e.get("graduation") or e.get("end") or "", reverse=True)
-    latest = education[0] if education else {}
     if key in ("name", "email", "phone", "location"):
         return contact.get(key) or None
     if key in ("linkedin", "github", "portfolio"):
@@ -149,14 +147,10 @@ def factual_value(key: str, question: str, prof: dict) -> str | None:
         return profile_mod.graduation_date(prof)
     if key == "start_date":
         return (prof.get("availability") or {}).get("start_date") or None
-    if key == "school":
-        return latest.get("institution") or None
-    if key == "degree":
-        return latest.get("degree") or None
-    if key == "major":
-        return latest.get("field") or None
-    if key == "gpa":
-        return latest.get("gpa") or None
+    if key in ("major", "gpa"):
+        education = sorted(prof.get("education") or [], key=lambda e: e.get("graduation") or e.get("end") or "", reverse=True)
+        latest = education[0] if education else {}
+        return latest.get("field" if key == "major" else "gpa") or None
     if key == "authorization":
         record = _country(question, prof)
         return _yes_no(record.get("authorized")) if record else None

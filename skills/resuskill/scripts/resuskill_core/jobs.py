@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 from . import SCHEMA_VERSION, store, input_schema
-from .util import ResuError, is_valid_date, norm_text, now_iso, slugify
+from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
 
 CATEGORIES = {"skill", "education", "experience", "location", "authorization", "availability", "other"}
 IMPORTANCE = {"required", "preferred", "unspecified"}
@@ -30,6 +30,11 @@ def load(job_id: str) -> dict:
 # Fields every command relies on; all have been written since the first job format.
 _STORED_FIELDS = {"id": str, "company": str, "title": str, "description": str,
                   "revision": int, "requirements": list, "tracking": dict}
+_STORED_CRITERION_FIELDS = {
+    "skill": {"skills": list, "match": str},
+    "degree": {"level": str, "fields": list, "status": str},
+    "authorization": {"country": str},
+}
 
 
 def _check_stored(job, folder: str) -> None:
@@ -43,6 +48,25 @@ def _check_stored(job, folder: str) -> None:
     if job["id"] != folder:
         raise ResuError(f"Stored job id {job['id']!r} does not match its folder {folder!r}; "
                         "a copied folder must keep its original name or be removed")
+    try:
+        input_schema.check(job["requirements"], input_schema.REQUIREMENTS, "stored requirements")
+    except ResuError as exc:
+        raise ResuError("Stored job has invalid requirements; restore a valid backup", exc.details) from exc
+    errors = []
+    for index, requirement in enumerate(job["requirements"]):
+        where = f"requirements[{index}]"
+        for field in ("id", "text", "excerpt", "category", "importance"):
+            if type(requirement.get(field)) is not str:
+                errors.append(f"{where}.{field} must be text")
+        criterion = requirement.get("criterion")
+        if criterion:
+            fields = {"type": str} | _STORED_CRITERION_FIELDS.get(criterion.get("type"), {})
+            for field, kind in fields.items():
+                if type(criterion.get(field)) is not kind:
+                    errors.append(f"{where}.criterion.{field} is missing or invalid")
+            _validate_criterion(criterion, where, errors)
+    if errors:
+        raise ResuError("Stored job has invalid requirements; restore a valid backup", errors)
 
 
 def save(job: dict) -> None:
@@ -142,14 +166,18 @@ def _validate_criterion(crit, where: str, errors: list[str]):
         if status not in ("any", "completed", "pursuing"):
             errors.append(f"{where}.criterion.status must be any, completed or pursuing")
         clean.update(level=level, fields=_str_list(crit, "fields", where, errors), status=status)
-    elif kind == "graduation_window":
-        start, end = crit.get("from"), crit.get("to")
+    elif kind in ("graduation_window", "availability"):
+        start_field, end_field = ("from", "to") if kind == "graduation_window" else ("start_from", "start_by")
+        start, end = crit.get(start_field), crit.get(end_field)
         if not start and not end:
-            errors.append(f"{where}.criterion needs 'from' and/or 'to'")
-        for name, value in (("from", start), ("to", end)):
+            errors.append(f"{where}.criterion needs {start_field} and/or {end_field}")
+        for name, value in ((start_field, start), (end_field, end)):
             if value and not is_valid_date(value):
                 errors.append(f"{where}.criterion.{name} must be a date")
-        clean.update({"from": start or None, "to": end or None})
+        if start and end and is_valid_date(start) and is_valid_date(end):
+            if date_key(start) > date_key(end, end_of_period=True):
+                errors.append(f"{where}.criterion.{start_field} must not be after {end_field}")
+        clean.update({start_field: start or None, end_field: end or None})
     elif kind == "location":
         mode = crit.get("work_mode")
         if mode not in (None, "remote", "hybrid", "onsite"):
@@ -166,14 +194,6 @@ def _validate_criterion(crit, where: str, errors: list[str]):
         if sponsorship not in (True, False, None):
             errors.append(f"{where}.criterion.sponsorship_available must be true, false or null")
         clean.update(country=country, sponsorship_available=sponsorship)
-    elif kind == "availability":
-        start_by, start_from = crit.get("start_by"), crit.get("start_from")
-        if not start_by and not start_from:
-            errors.append(f"{where}.criterion needs start_by and/or start_from")
-        for name, value in (("start_by", start_by), ("start_from", start_from)):
-            if value and not is_valid_date(value):
-                errors.append(f"{where}.criterion.{name} must be a date")
-        clean.update(start_by=start_by or None, start_from=start_from or None)
     elif kind == "years_experience":
         years = crit.get("years")
         if not isinstance(years, (int, float)) or years < 0:
@@ -195,10 +215,13 @@ def validate_requirements(job: dict, items) -> list[dict]:
     used_ids: set[str] = set()
     # Requirements without an id keep the id of the saved requirement with the same text and
     # excerpt; new ones get a number never used before, so evidence and overrides stay attached.
-    previous = {_requirement_key(r): r["id"] for r in job.get("requirements") or []}
+    previous = {}
+    for requirement in job.get("requirements") or []:
+        previous.setdefault(_requirement_key(requirement), []).append(requirement["id"])
     explicit = {str(i.get("id") or "").strip() for i in items if isinstance(i, dict)} - {""}
+    previous_ids = {rid for ids in previous.values() for rid in ids}
     counter = max([int(job.get("requirement_counter", 0))] + [
-        int(m.group(1)) for rid in explicit | set(previous.values()) for m in [re.fullmatch(r"r(\d+)", rid)] if m
+        int(m.group(1)) for rid in explicit | previous_ids for m in [re.fullmatch(r"r(\d+)", rid)] if m
     ])
     for index, item in enumerate(items):
         where = f"requirements[{index}]"
@@ -221,8 +244,9 @@ def validate_requirements(job: dict, items) -> list[dict]:
             errors.append(f"{where}.excerpt not found in the job description: {excerpt[:80]!r}")
         req_id = str(item.get("id") or "").strip()
         if not req_id:
-            reuse = previous.get(_requirement_key({"text": text, "excerpt": excerpt}))
-            if reuse and reuse not in used_ids and reuse not in explicit:
+            reuse = next((rid for rid in previous.get(_requirement_key({"text": text, "excerpt": excerpt}), [])
+                          if rid not in used_ids and rid not in explicit), None)
+            if reuse:
                 req_id = reuse
             else:
                 counter += 1

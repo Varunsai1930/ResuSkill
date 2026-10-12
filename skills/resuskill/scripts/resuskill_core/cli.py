@@ -113,7 +113,7 @@ def cmd_job(args) -> None:
     elif args.action == "show":
         job = jobs_mod.load(args.job)
         if args.description:
-            print(job["description"])
+            out(job["description"], args.json, job["description"])
             return
         out(job, args.json, job_text(job))
     elif args.action == "requirements":
@@ -199,8 +199,8 @@ def cmd_resume(args) -> None:
             + (f"\nWarnings:\n{bullets(warnings)}" if warnings else "")
             + f"\nShow the user `render {args.job} --proposal` / review.html, then `resume accept {args.job}` after they approve.")
     elif args.action == "accept":
-        package_mod.accept_resume(args.job)
-        print("Accepted the current proposal as the package resume. Approval (if any) was cleared.")
+        pkg = package_mod.accept_resume(args.job)
+        out(pkg, args.json, "Accepted the current proposal as the package resume. Approval (if any) was cleared.")
     elif args.action == "show":
         if args.proposal:
             record = package_mod.load_proposal(args.job)
@@ -245,32 +245,34 @@ def cmd_questions(args) -> None:
         out(package_mod.resolved(job, prof, pkg)["answers"], args.json, answers_text(job, prof, pkg))
     elif args.action == "categorize":
         question = package_mod.set_category(args.job, args.qid, args.category)
-        print(f"{question['id']} is now {question['category']}.")
+        out(question, args.json, f"{question['id']} is now {question['category']}.")
     elif args.action == "remove":
         package_mod.remove_question(args.job, args.qid)
-        print(f"Removed {args.qid}.")
+        out({"removed": args.qid}, args.json, f"Removed {args.qid}.")
 
 
 def cmd_answers(args) -> None:
     if args.action == "propose":
         staged = package_mod.propose_answers(args.job, store.load_input(args.file), args.model or "")
-        print(f"Stored drafts for {', '.join(staged)} (pending review). Accept with `answers accept {args.job} <ids>`.")
+        out({"staged": staged}, args.json,
+            f"Stored drafts for {', '.join(staged)} (pending review). Accept with `answers accept {args.job} <ids>`.")
     elif args.action == "accept":
         accepted = package_mod.accept_answers(args.job, args.qids)
-        print(f"Accepted {', '.join(accepted)}. Approval (if any) was cleared.")
+        out({"accepted": accepted}, args.json, f"Accepted {', '.join(accepted)}. Approval (if any) was cleared.")
     elif args.action == "set":
         text = store.load_text(args.file) if args.file else args.text
-        package_mod.set_answer(args.job, args.qid, text, skip=args.skip)
-        print(f"Saved the user's answer for {args.qid}." if not args.skip else f"Marked {args.qid} as skipped.")
+        answer = package_mod.set_answer(args.job, args.qid, text, skip=args.skip)
+        out(answer, args.json,
+            f"Saved the user's answer for {args.qid}." if not args.skip else f"Marked {args.qid} as skipped.")
     elif args.action == "confirm":
         answer = package_mod.confirm_answer(args.job, args.qid)
-        print(f"Confirmed {args.qid}: {answer['text']}")
+        out(answer, args.json, f"Confirmed {args.qid}: {answer['text']}")
 
 
 def cmd_bank(args) -> None:
     if args.action == "save":
         entry = package_mod.bank_save(args.job, args.qid)
-        print(f"Saved to answer bank as {entry['id']}.")
+        out(entry, args.json, f"Saved to answer bank as {entry['id']}.")
     else:
         items = q_mod.bank()
         out(items, args.json, "\n".join(f"[{i['id']}] {i['question']}\n    {i['text']}" for i in items) or "Answer bank is empty.")
@@ -290,7 +292,7 @@ def cmd_package(args) -> None:
         return 1 if blockers else 0
     elif args.action == "approve":
         pkg = package_mod.approve(args.job)
-        print(f"Package approved (hash {pkg['approval']['hash']}). This does not mark it Applied.")
+        out(pkg, args.json, f"Package approved (hash {pkg['approval']['hash']}). This does not mark it Applied.")
 
 
 def cmd_render(args) -> None:
@@ -494,6 +496,9 @@ def main(argv=None) -> int:
         args.json = False
     try:
         result = args.func(args)
+    except KeyboardInterrupt:
+        print("error: interrupted", file=sys.stderr)
+        return 130
     except ResuError as exc:
         print(f"error: {exc}", file=sys.stderr)
         for detail in exc.details:
