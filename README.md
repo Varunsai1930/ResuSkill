@@ -7,7 +7,7 @@ An agent skill for **Claude Code** and **Codex** that turns your confirmed profi
 **Ready for friend testing:** start with the fictional demo below, then try one real application with careful review. Agent behavior in both clients still needs the [25-case evaluation](evals/README.md) before a validated public release.
 
 ```text
-Create profile → Add job → Review requirements → Tailor resume
+Create profile → (Find jobs) → Add job → Review requirements → Tailor resume
 → Draft answers → Review & approve → Export PDF → Submit yourself → Track
 ```
 
@@ -29,6 +29,10 @@ A skill is instructions an agent follows, so ResuSkill pairs its workflow with e
 | | Tracks Draft / Approved / Stale, and freezes exactly what you submitted |
 
 Missing information stays **Unknown** in the checklist. The CLI checks citations and selected claim types; it cannot prove that a paraphrase is true or authenticate whether an agent actually obtained your approval.
+
+## Finding jobs
+
+Ask "find me data analyst jobs" and the agent runs `profile search-terms --role "Data Analyst"`, which builds search queries from the skills your profile actually backs (ranked by how many roles and projects use them), your location and work-mode preferences, and your level. It searches with its own web search tool, lists the postings it really found with links and a quick fit note, and saves only the ones you pick, then continues with the normal checklist and tailoring.
 
 ## Example
 
@@ -102,12 +106,13 @@ For each job, under `~/.resuskill/jobs/<job-id>/out/`:
 
 - All data stays on your machine in `~/.resuskill/` (override with `RESUSKILL_HOME`). It's plain JSON you can read, back up or delete.
 - Your agent sends what it reads, including your profile, to its model provider (Anthropic or OpenAI) as part of normal use, under your account's terms. Leave anything confidential out of the profile.
-- Nothing is uploaded anywhere else. The skill makes no network requests.
+- Nothing is uploaded anywhere else. The skill's CLI makes no network requests.
+- When you ask the agent to find jobs, it sends search terms (target roles, skills, locations, never your name or contact details) to its web search provider.
 
 ## Limits
 
 - Automated checks catch invented numbers, technologies and credentials; they can't judge meaning. Your review is what makes the content accurate.
-- It does not find jobs, fill employer forms or submit applications.
+- Job search uses your agent's own web search, so it only works in clients that have one. Many job boards block automated access; the agent marks postings it could not open as unverified. It does not fill employer forms or submit applications.
 - One profile, one resume template, English-oriented keyword rules.
 - Unknown questions default to user input. The conservative writing-prompt allow-list may send harmless questions to you too.
 - Cross-client behavioral evaluation is still required before claiming a validated public release. The [25-case evaluation pack](evals/README.md) records this separately from Python test results.

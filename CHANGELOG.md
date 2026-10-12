@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add job finding: `profile search-terms` builds offline search queries from confirmed profile skills (ranked by supporting entries), roles, locations, work mode and graduation level, without contact details. SKILL.md tells the agent to search with its own web tool, list only postings it actually found, mark unopened ones unverified and save only postings the user picks.
 - Preserve distinct IDs for duplicate profile entries, bullets and requirements when unchanged input is saved again; reserve explicitly supplied IDs before matching implicit ones. Reject malformed bullet IDs.
 - Keep availability Unknown when a job gives only its earliest start and the candidate is available later. Reject reversed availability/graduation date windows and share their date-validation logic.
 - Prevent legacy authorization/sponsorship questions stored as ordinary factual questions from bypassing confirmation. Validation policy v5 makes earlier approvals stale.

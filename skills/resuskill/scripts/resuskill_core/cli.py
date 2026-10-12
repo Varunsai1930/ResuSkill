@@ -13,6 +13,7 @@ from . import package as package_mod
 from . import profile as profile_mod
 from . import questions as q_mod
 from . import render as render_mod
+from . import search as search_mod
 from . import store
 from . import track as track_mod
 from .util import ResuError
@@ -82,6 +83,29 @@ def cmd_profile(args) -> None:
         text = f"Saved profile r{prof['_meta']['revision']}:\n{bullets(changes)}" if changes else "No changes; profile unchanged."
         out({"revision": prof["_meta"]["revision"], "changes": changes, "warnings": warnings}, args.json,
             text + (f"\nWarnings:\n{bullets(warnings)}" if warnings else ""))
+    elif args.action == "search-terms":
+        result = search_mod.terms(args.role, args.location, args.max_queries, args.skill)
+        out(result, args.json, search_text(result))
+
+
+def search_text(result: dict) -> str:
+    skills = ", ".join(f"{s['name']} ({s['evidence_count']})" for s in result["skills"]) or "-"
+    level = result["level"]
+    lines = [f"Roles ({result['role_source']}): {', '.join(result['roles']) or '-'}",
+             f"Skills (entries using each): {skills}",
+             f"In queries: {', '.join(result['query_skills']) or '-'}",
+             f"Locations: {', '.join(result['locations']) or '-'} | work_mode: {result['work_mode'] or 'unknown'}",
+             f"Level: {level['hint'] or 'unknown'} ({level['basis']})"]
+    if result["skills_absent"]:
+        lines.append(f"Confirmed not held: {', '.join(result['skills_absent'])}")
+    if result["sponsorship_needed"]:
+        lines.append(f"Needs sponsorship in: {', '.join(result['sponsorship_needed'])}")
+    if result["authorization_unknown"]:
+        lines.append(f"Authorization unknown for: {', '.join(result['authorization_unknown'])}")
+    lines.append("Queries:\n" + (bullets(result["queries"]) if result["queries"] else "  (none)"))
+    if result["warnings"]:
+        lines.append(f"Warnings:\n{bullets(result['warnings'])}")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- jobs and checklist
@@ -354,6 +378,11 @@ def build_parser() -> argparse.ArgumentParser:
     for name, desc in (("diff", "preview changes without saving"), ("save", "validate and save (after user confirmation)")):
         x = ps.add_parser(name, parents=[common], help=desc)
         x.add_argument("--file", required=True, help="profile JSON file, or - for stdin")
+    x = ps.add_parser("search-terms", parents=[common], help="job-search queries from the profile (offline)")
+    x.add_argument("--role", action="append", help="target role from the user's request (repeatable)")
+    x.add_argument("--location", action="append", help="location to search (repeatable)")
+    x.add_argument("--skill", action="append", help="confirmed profile skill to put in queries (repeatable; default: top 3)")
+    x.add_argument("--max-queries", type=int, default=6)
     p.set_defaults(func=cmd_profile)
 
     p = sub.add_parser("job", help="saved jobs")

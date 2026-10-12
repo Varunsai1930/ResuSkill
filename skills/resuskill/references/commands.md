@@ -16,6 +16,7 @@
 | `$RS profile show [--json]` | Show the profile with entry and bullet IDs |
 | `$RS profile diff --file F` | Validate and list changes **without saving** |
 | `$RS profile save --file F` | Validate, keep IDs, bump revision, archive old version (only after user confirms) |
+| `$RS profile search-terms [--role R]... [--location L]... [--skill S]... [--max-queries N]` | Offline: job-search queries plus ranked confirmed skills, level hint, skills not held and sponsorship needs. Roles default to `preferences.roles`, then recent job titles; `--skill` accepts only confirmed profile skills. Never includes contact details |
 
 ## Jobs and checklist
 | Command | Purpose |
