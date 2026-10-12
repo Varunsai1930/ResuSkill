@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remote searches name each country the user is authorized to work in (`Remote United States`), since a bare "Remote" mostly returned postings from other countries. SKILL.md tells the agent to open job-board search pages and list only individual postings.
+- Harden search terms: omit contact-address fallbacks, preserve remote-only filters with explicit locations, leave ambiguous graduation dates/levels Unknown, and prioritize ongoing/recent roles using available dates. Add regression coverage and align the agent instructions and command reference.
 - Add job finding: `profile search-terms` builds offline search queries from confirmed profile skills (ranked by supporting entries), roles, locations, work mode and graduation level, without contact details. SKILL.md tells the agent to search with its own web tool, list only postings it actually found, mark unopened ones unverified and save only postings the user picks.
 - Preserve distinct IDs for duplicate profile entries, bullets and requirements when unchanged input is saved again; reserve explicitly supplied IDs before matching implicit ones. Reject malformed bullet IDs.
 - Keep availability Unknown when a job gives only its earliest start and the candidate is available later. Reject reversed availability/graduation date windows and share their date-validation logic.

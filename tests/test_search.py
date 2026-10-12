@@ -2,6 +2,8 @@ import copy
 import json
 import subprocess
 import sys
+from datetime import date
+from unittest import mock
 
 from helpers import IsolatedHome, ROOT, fixture
 
@@ -29,7 +31,7 @@ class SearchTermsTests(IsolatedHome):
         self.save()
         result = search.terms()
         self.assertEqual(result["role_source"], "preferences")
-        self.assertEqual(result["locations"], ["Austin", "Remote"])
+        self.assertEqual(result["locations"], ["Austin", "Remote United States"])
         self.assertEqual(len(result["queries"]), 2)
         dumped = json.dumps(result)
         for private in ("Jordan", "jordan@example.com", "555 0100", "linkedin"):
@@ -59,8 +61,9 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms()
         self.assertEqual(result["role_source"], "experience titles")
         self.assertEqual(result["roles"], ["Software Engineering Intern"])
-        self.assertEqual(result["locations"], ["Austin, TX"])
+        self.assertEqual(result["locations"], [])
         self.assertTrue(any("past job titles" in w for w in result["warnings"]))
+        self.assertTrue(any("No location preference" in w for w in result["warnings"]))
         self.assertTrue(any("Work mode unknown" in w for w in result["warnings"]))
 
     def test_no_roles_gives_no_queries(self):
@@ -109,7 +112,49 @@ class SearchTermsTests(IsolatedHome):
 
     def test_remote_only_searches_remote(self):
         self.save(preferences={"roles": ["Data Analyst"], "locations": ["Austin"], "work_mode": "remote"})
+        result = search.terms(max_queries=1)
+        self.assertEqual(result["locations"], ["Remote United States"])
+        self.assertIn("Remote United States", result["queries"][0])
+
+    def test_remote_uses_authorized_countries_or_plain_remote(self):
+        prefs = {"roles": ["Data Analyst"], "locations": [], "work_mode": "remote"}
+        self.save(preferences=prefs, authorization=[{"country": "US", "authorized": False, "requires_sponsorship": True},
+                                                    {"country": "CA", "authorized": True, "requires_sponsorship": False},
+                                                    {"country": "BR", "authorized": True, "requires_sponsorship": False}])
+        self.assertEqual(search.terms()["locations"], ["Remote Canada", "Remote BR"])
+        self.save(preferences=prefs, authorization=[{"country": "US"}])
         self.assertEqual(search.terms()["locations"], ["Remote"])
+
+    def test_explicit_locations_keep_remote_only_filter_when_queries_are_capped(self):
+        self.save(preferences={"roles": ["Data Analyst"], "locations": ["Austin"], "work_mode": "remote"})
+        result = search.terms(locations=["Austin", "Dallas"], max_queries=1)
+        self.assertEqual(result["locations"], ["Austin", "Dallas"])
+        self.assertEqual(len(result["queries"]), 1)
+        self.assertIn("Austin", result["queries"][0])
+        self.assertIn("Remote", result["queries"][0])
+        self.assertTrue(all("Remote" in q for q in search.terms(locations=["Austin", "Dallas"])["queries"]))
+
+    def test_cli_keeps_remote_and_unknown_level_without_contact_address(self):
+        data = fixture("profile.json")
+        data["contact"]["location"] = "Private Street, Apartment B"
+        data["education"][0]["end"] = str(date.today().year)
+        data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "remote"}
+        profile.save(data)
+        command = [sys.executable, str(ROOT / "skills/resuskill/scripts/resuskill.py"),
+                   "profile", "search-terms", "--location", "Austin", "--max-queries", "1"]
+        result = subprocess.run(command + ["--json"], text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertIsNone(output["level"]["hint"])
+        self.assertIn("Austin", output["queries"][0])
+        self.assertIn("Remote", output["queries"][0])
+        self.assertNotIn("Private Street", result.stdout)
+        self.assertTrue(any("graduation" in w.lower() for w in output["warnings"]))
+        text = subprocess.run(command, text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(text.returncode, 0, text.stderr)
+        self.assertIn("Level: unknown", text.stdout)
+        self.assertIn("Remote", text.stdout)
+        self.assertNotIn("Private Street", text.stdout)
 
     def test_query_cap_keeps_every_role_and_warns(self):
         self.save(preferences={"roles": ["Data Analyst", "BI Analyst", "Analytics Engineer"],
@@ -122,14 +167,17 @@ class SearchTermsTests(IsolatedHome):
         with self.assertRaises(ResuError):
             search.terms(max_queries=0)
 
-    def test_contact_location_fallback_drops_street_and_postal_code(self):
-        data = fixture("profile.json")
-        data["contact"]["location"] = "12 Oak St, Austin, TX 78701"
-        data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
-        profile.save(data)
-        result = search.terms()
-        self.assertEqual(result["locations"], ["Austin"])
-        self.assertNotIn("Oak", json.dumps(result))
+    def test_contact_addresses_are_not_used_as_search_locations(self):
+        for address in ("12 Oak St, Austin, TX 78701", "Oak Street, Austin", "Apartment B, Oak Street"):
+            with self.subTest(address=address):
+                data = fixture("profile.json")
+                data["contact"]["location"] = address
+                data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
+                profile.save(data)
+                result = search.terms()
+                self.assertEqual(result["locations"], [])
+                self.assertNotIn("Oak", json.dumps(result))
+                self.assertTrue(any("No location preference" in w for w in result["warnings"]))
 
     def test_fallback_titles_are_most_recent_first(self):
         data = fixture("profile.json")
@@ -141,6 +189,40 @@ class SearchTermsTests(IsolatedHome):
         data["experience"] = [old, data["experience"][0], current]
         profile.save(data)
         self.assertEqual(search.terms()["roles"], ["Data Analyst", "Software Engineering Intern"])
+
+    def test_ongoing_role_precedes_roles_with_future_end_dates(self):
+        self.save(preferences={"roles": [], "locations": ["Austin"], "work_mode": "onsite"}, experience=[
+            {"organization": "Future Co", "title": "Engineering Fellow", "start": "2026", "end": "2099"},
+            {"organization": "Current Co", "title": "Engineering Manager", "start": "2025", "end": "present"},
+            {"organization": "Old Co", "title": "Intern", "start": "2010", "end": "2011"},
+        ])
+        self.assertEqual(search.terms()["roles"], ["Engineering Manager", "Engineering Fellow"])
+
+    def test_role_recency_uses_start_date_when_end_date_is_unknown(self):
+        self.save(preferences={"roles": [], "locations": ["Austin"], "work_mode": "onsite"}, experience=[
+            {"organization": "Old Co", "title": "Intern", "start": "2010", "end": "2011"},
+            {"organization": "New Co", "title": "Engineer", "start": "2025"},
+        ])
+        self.assertEqual(search.terms()["roles"], ["Engineer", "Intern"])
+
+    def test_graduation_period_including_today_keeps_level_unknown(self):
+        with mock.patch.object(search, "today_key", return_value=(2026, 10, 12)):
+            for graduation in ("2026", "2026-10", "2026-10-12"):
+                with self.subTest(graduation=graduation):
+                    self.save(education=[{"institution": "Example University", "degree": "B.S.", "end": graduation}])
+                    result = search.terms()
+                    self.assertIsNone(result["level"]["hint"])
+                    self.assertNotIn("graduated", result["level"]["basis"])
+                    self.assertTrue(any("graduation" in w.lower() for w in result["warnings"]))
+                    self.assertFalse(any("entry level" in q or "intern" in q for q in result["queries"]))
+
+    def test_unambiguous_graduation_dates_keep_supported_level_hints(self):
+        with mock.patch.object(search, "today_key", return_value=(2026, 10, 12)):
+            for graduation, expected in (("2026-10-13", "student"), ("2026-10-11", "recent graduate"),
+                                         ("2026-09", "recent graduate"), ("2025-10-11", None)):
+                with self.subTest(graduation=graduation):
+                    self.save(education=[{"institution": "Example University", "degree": "B.S.", "end": graduation}])
+                    self.assertEqual(search.terms()["level"]["hint"], expected)
 
     def test_further_degree_after_completed_one_gives_no_level(self):
         data = fixture("profile.json")
@@ -173,23 +255,26 @@ class SearchTermsTests(IsolatedHome):
         for term in ("Data Analyst", "BI Analyst", "Analytics Engineer", "Austin", "Dallas", "Remote"):
             self.assertTrue(any(term in q for q in queries), term)
 
-    def test_street_names_without_numbers_are_dropped(self):
+    def test_explicit_search_locations_do_not_expose_contact_addresses(self):
         data = fixture("profile.json")
         data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
         for location, city in (("Baker Street, London", "London"),
                                ("Rosewood Apartments, Austin, TX", "Austin, TX")):
             data["contact"]["location"] = location
             profile.save(copy.deepcopy(data))
-            self.assertEqual(search.terms()["locations"], [city], location)
+            result = search.terms(locations=[city])
+            self.assertEqual(result["locations"], [city])
+            self.assertNotIn(location, json.dumps(result))
 
-    def test_filtered_contact_location_gets_specific_warning(self):
+    def test_contact_postal_code_requires_a_search_location(self):
         data = fixture("profile.json")
         data["contact"]["location"] = "560001"
         data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
         profile.save(data)
         result = search.terms()
         self.assertEqual(result["locations"], [])
-        self.assertTrue(any("no usable city" in w for w in result["warnings"]))
+        self.assertNotIn("560001", json.dumps(result))
+        self.assertTrue(any("No location preference" in w for w in result["warnings"]))
 
     def test_requires_profile(self):
         with self.assertRaises(ResuError):

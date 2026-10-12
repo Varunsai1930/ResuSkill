@@ -34,22 +34,12 @@ def _roles(prof: dict, requested: list[str]) -> tuple[list[str], str]:
         return preferred, "preferences"
     # Most recent first: ongoing roles, then by end date, then by start date.
     def recency(entry):
-        return (date_key(entry.get("end"), end_of_period=True) or (0, 0, 0),
+        return (entry.get("end") == "present",
+                date_key(entry.get("end"), end_of_period=True) or date_key(entry.get("start")) or (0, 0, 0),
                 date_key(entry.get("start")) or (0, 0, 0))
     recent = sorted(prof.get("experience") or [], key=recency, reverse=True)
     titles = _unique(e.get("title") for e in recent)
     return titles[:2], "experience titles" if titles else "none"
-
-
-_STREET = re.compile(r"\b(street|st|road|rd|avenue|ave|lane|ln|drive|dr|boulevard|blvd|way|court|ct|place|pl|"
-                     r"apartments?|apt|suite|ste|unit|floor|flat|building|bldg|house|po box)\b", re.I)
-
-
-def _city(location) -> str:
-    """The city/region part of a contact location, without street lines or postal codes."""
-    parts = [p.strip() for p in str(location or "").split(",")]
-    kept = [p for p in parts if p and not re.search(r"\d", p) and not _STREET.search(p)]
-    return ", ".join(kept[-2:])
 
 
 def ranked_skills(prof: dict) -> list[dict]:
@@ -81,6 +71,8 @@ def _level(prof: dict) -> dict:
     if not span:
         return {"hint": None, "basis": "graduation date unknown; ask the user which level to search"}
     today = today_key()
+    if span[0] <= today <= span[1]:
+        return {"hint": None, "basis": f"graduation date {grad} does not establish completion; ask the user which level to search"}
     if span[0] > today:
         # Only a finished bachelor's or higher counts; high school or an associate degree before
         # a transfer does not make a current student experienced.
@@ -96,6 +88,20 @@ def _level(prof: dict) -> dict:
     return {"hint": None, "basis": f"graduated {grad}; ask the user which level to search"}
 
 
+_COUNTRIES = {"US": "United States", "CA": "Canada", "GB": "United Kingdom", "UK": "United Kingdom",
+              "IE": "Ireland", "AU": "Australia", "NZ": "New Zealand", "IN": "India", "DE": "Germany",
+              "FR": "France", "NL": "Netherlands", "ES": "Spain", "SG": "Singapore", "JP": "Japan"}
+
+
+def _remote_places(prof: dict) -> list[str]:
+    """"Remote <country>" for each country the user is authorized to work in; plain "Remote" if none is known.
+
+    A bare "Remote" query returns postings from anywhere, most of which the user cannot take.
+    """
+    countries = [a["country"] for a in prof.get("authorization") or [] if a.get("authorized") is True]
+    return [f"Remote {_COUNTRIES.get(c, c)}" for c in countries] or ["Remote"]
+
+
 _LEVEL_TERMS = {"student": 'intern OR "entry level"', "recent graduate": '"entry level"'}
 _LEVEL_WORDS = re.compile(r"\b(intern|internship|co-?op|new grad|entry[- ]level|junior|senior|lead|principal|staff)\b", re.I)
 
@@ -108,15 +114,14 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     roles, role_source = _roles(prof, requested_roles or [])
     skills = ranked_skills(prof)
     work_mode = prefs.get("work_mode")
-    contact_location = (prof.get("contact") or {}).get("location")
     if locations:
         places = _unique(locations)  # the user's request: search exactly these
     elif work_mode == "remote":
-        places = ["Remote"]
+        places = _remote_places(prof)
     else:
-        places = _unique(prefs.get("locations") or [_city(contact_location)])
-        if work_mode == "any" and "remote" not in {norm_text(p) for p in places}:
-            places.append("Remote")
+        places = _unique(prefs.get("locations") or [])
+        if work_mode == "any" and not any(norm_text(p).startswith("remote") for p in places):
+            places.extend(_remote_places(prof))
     level = _level(prof)
     warnings = []
     if not roles:
@@ -125,13 +130,12 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         warnings.append("No preferences.roles; roles come from past job titles. Confirm them with the user")
     if not skills:
         warnings.append("No confirmed skills in the profile; queries use roles only")
-    if not places and contact_location and not prefs.get("locations"):
-        warnings.append("Contact location has no usable city (street or postal code only were removed); "
-                        "ask the user where to search")
-    elif not places:
-        warnings.append("No location preference or contact location; ask the user where to search")
+    if not places or (not locations and not prefs.get("locations") and work_mode != "remote"):
+        warnings.append("No location preference; ask the user for a search city/region or pass --location")
     if work_mode is None:
         warnings.append("Work mode unknown; ask the user whether remote roles count")
+    if level["hint"] is None and any(not _LEVEL_WORDS.search(role) for role in roles):
+        warnings.append(level["basis"])
 
     if query_skills:
         by_key = {canon(s["name"]): s["name"] for s in skills}
@@ -150,7 +154,8 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     for i, j in pairs:
         role, place = roles[j], (places or [""])[i]
         suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
-        queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place) if p))
+        remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
+        queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place, remote) if p))
     if len(queries) > max_queries:
         warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
                         "raise it or narrow roles/locations to search them")

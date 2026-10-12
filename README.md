@@ -34,6 +34,8 @@ Missing information stays **Unknown** in the checklist. The CLI checks citations
 
 Ask "find me data analyst jobs" and the agent runs `profile search-terms --role "Data Analyst"`, which builds search queries from the skills your profile actually backs (ranked by how many roles and projects use them), your location and work-mode preferences, and your level. It searches with its own web search tool, lists the postings it really found with links and a quick fit note, and saves only the ones you pick, then continues with the normal checklist and tailoring.
 
+Search locations come from your saved preferences or an explicit `--location` city/region. If they are missing, the agent asks you; your contact address is never used to infer a search location. Remote-only preferences apply even with an explicit city, and uncertain graduation dates leave your target level Unknown until you clarify it.
+
 ## Example
 
 ```text

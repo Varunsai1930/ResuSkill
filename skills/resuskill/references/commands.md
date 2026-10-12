@@ -16,7 +16,7 @@
 | `$RS profile show [--json]` | Show the profile with entry and bullet IDs |
 | `$RS profile diff --file F` | Validate and list changes **without saving** |
 | `$RS profile save --file F` | Validate, keep IDs, bump revision, archive old version (only after user confirms) |
-| `$RS profile search-terms [--role R]... [--location L]... [--skill S]... [--max-queries N]` | Offline: job-search queries plus ranked confirmed skills, level hint, skills not held and sponsorship needs. Roles default to `preferences.roles`, then the two most recent job titles. `--location` searches exactly those places; otherwise preference locations (or the city from the contact location) plus Remote for `any`, and only Remote for `remote`. `--skill` accepts only confirmed profile skills. Warns when the query cap leaves queries out. Never includes name, email, phone, links or street address |
+| `$RS profile search-terms [--role R]... [--location L]... [--skill S]... [--max-queries N]` | Offline: job-search queries plus ranked confirmed skills, level hint, skills not held and sponsorship needs. Roles default to `preferences.roles`, then the two most recent job titles (ongoing first). Locations come from `--location` or `preferences.locations`; contact addresses are never used. Missing search locations prompt a warning. `any` adds a Remote alternative by default; `remote` searches Remote by default and keeps a Remote filter with explicit locations. Remote searches say `Remote <country>` for each country the user is authorized to work in (plain `Remote` when none is known). Graduation dates that include today leave the level Unknown. `--skill` accepts only confirmed profile skills. Warns when the query cap leaves queries out. |
 
 ## Jobs and checklist
 | Command | Purpose |
