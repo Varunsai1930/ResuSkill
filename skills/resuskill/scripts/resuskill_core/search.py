@@ -109,9 +109,9 @@ def _remote_places(prof: dict) -> list[str]:
 
 
 LEVELS = ("student", "intern", "entry", "junior", "mid", "senior", "lead", "manager", "director", "any")
-_LEVEL_TERMS = {"student": 'intern OR "entry level"', "recent graduate": '"entry level"',
-                "intern": "intern", "entry": '"entry level"', "junior": "junior", "mid": '"mid level"',
-                "senior": "senior", "lead": "lead", "manager": "manager", "director": "director"}
+_LEVEL_TERMS = {"student": ("intern", '"entry level"'), "recent graduate": ('"entry level"',),
+                "intern": ("intern",), "entry": ('"entry level"',), "junior": ("junior",), "mid": ('"mid level"',),
+                "senior": ("senior",), "lead": ("lead",), "manager": ("manager",), "director": ("director",)}
 _LEVEL_WORDS = re.compile(
     r"\b(intern|internship|co-?op|new grad|entry[- ]level|junior|mid[- ]level|senior|lead|principal|staff|"
     r"manager|director|head|executive|vp|vice president)\b", re.I)
@@ -165,12 +165,16 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     # as far as the cap allows, instead of dropping the last role or place (often Remote) whole.
     pairs = [(i, j) for i in range(len(places or [""])) for j in range(len(roles))]
     pairs.sort(key=lambda ij: (ij[0] + ij[1], ij[0]))  # within a diagonal, new roles before new places
+    suffixes = [("",) if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], ("",)) for role in roles]
     queries = []
-    for i, j in pairs:
-        role, place = roles[j], (places or [""])[i]
-        suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
-        remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
-        queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place, remote) if p))
+    # Finish a round across roles/places before repeating them for another level alternative.
+    for variant in range(max(map(len, suffixes), default=0)):
+        for i, j in pairs:
+            if variant >= len(suffixes[j]):
+                continue
+            role, place = roles[j], (places or [""])[i]
+            remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
+            queries.append(" ".join(p for p in (f'"{role}"', suffixes[j][variant], top, place, remote) if p))
     if len(queries) > max_queries:
         warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
                         "raise it or narrow roles/locations to search them")

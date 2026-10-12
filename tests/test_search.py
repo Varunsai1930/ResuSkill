@@ -41,7 +41,7 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms()
         self.assertEqual(result["role_source"], "preferences")
         self.assertEqual(result["locations"], ["Austin", "Remote United States"])
-        self.assertEqual(len(result["queries"]), 2)
+        self.assertEqual(len(result["queries"]), 4)
         dumped = json.dumps(result)
         for private in ("Jordan", "jordan@example.com", "555 0100", "linkedin"):
             self.assertNotIn(private, dumped)
@@ -51,7 +51,7 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms(["Data Analyst"], ["Dallas, TX"], query_skills=["sql", "python"])
         self.assertEqual(result["role_source"], "request")
         self.assertEqual(result["query_skills"], ["SQL", "Python"])
-        self.assertEqual(result["queries"][0], '"Data Analyst" intern OR "entry level" SQL Python Dallas, TX')
+        self.assertEqual(result["queries"][0], '"Data Analyst" intern SQL Python Dallas, TX')
         self.assertEqual(result["locations"], ["Dallas, TX"])
 
     def test_query_skills_must_be_confirmed(self):
@@ -172,7 +172,7 @@ class SearchTermsTests(IsolatedHome):
         self.assertEqual(len(result["queries"]), 4)
         for role in ("Data Analyst", "BI Analyst", "Analytics Engineer"):
             self.assertTrue(any(f'"{role}"' in q for q in result["queries"]), role)
-        self.assertTrue(any("5 queries left out" in w for w in result["warnings"]))
+        self.assertTrue(any("14 queries left out" in w for w in result["warnings"]))
         with self.assertRaises(ResuError):
             search.terms(max_queries=0)
 
@@ -338,3 +338,22 @@ class SearchTermsTests(IsolatedHome):
         invalid = subprocess.run(command + ["made-up"], text=True, encoding="utf-8", capture_output=True)
         self.assertEqual(invalid.returncode, 2)
         self.assertNotIn("Traceback", invalid.stderr)
+
+    def test_student_alternatives_are_independent_complete_queries(self):
+        self.save()
+        result = search.terms(["Data Analyst"], ["Austin"], query_skills=["SQL", "Python"])
+        self.assertEqual(result["queries"], [
+            '"Data Analyst" intern SQL Python Austin',
+            '"Data Analyst" "entry level" SQL Python Austin',
+        ])
+        self.assertFalse(any(" OR " in q for q in result["queries"]))
+        capped = search.terms(["Data Analyst"], ["Austin"], max_queries=1)
+        self.assertEqual(len(capped["queries"]), 1)
+        self.assertTrue(any("1 queries left out" in w for w in capped["warnings"]))
+
+    def test_level_alternatives_do_not_repeat_explicit_level_titles(self):
+        self.save()
+        result = search.terms(["Data Analyst", "Data Analyst Intern"], ["Austin"])
+        self.assertEqual(len(result["queries"]), 3)
+        self.assertEqual(sum(q.startswith('"Data Analyst Intern"') for q in result["queries"]), 1)
+        self.assertEqual(len(set(result["queries"])), 3)
