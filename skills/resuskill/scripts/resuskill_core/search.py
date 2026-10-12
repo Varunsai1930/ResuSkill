@@ -108,13 +108,21 @@ def _remote_places(prof: dict) -> list[str]:
     return [f"Remote {_COUNTRIES.get(c, c)}" for c in countries] or ["Remote"]
 
 
-_LEVEL_TERMS = {"student": 'intern OR "entry level"', "recent graduate": '"entry level"'}
-_LEVEL_WORDS = re.compile(r"\b(intern|internship|co-?op|new grad|entry[- ]level|junior|senior|lead|principal|staff)\b", re.I)
+LEVELS = ("student", "intern", "entry", "junior", "mid", "senior", "lead", "manager", "director", "any")
+_LEVEL_TERMS = {"student": 'intern OR "entry level"', "recent graduate": '"entry level"',
+                "intern": "intern", "entry": '"entry level"', "junior": "junior", "mid": '"mid level"',
+                "senior": "senior", "lead": "lead", "manager": "manager", "director": "director"}
+_LEVEL_WORDS = re.compile(
+    r"\b(intern|internship|co-?op|new grad|entry[- ]level|junior|mid[- ]level|senior|lead|principal|staff|"
+    r"manager|director|head|executive|vp|vice president)\b", re.I)
 
 
-def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skills=None) -> dict:
+def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skills=None, level=None) -> dict:
     if max_queries < 1:
         raise ResuError("--max-queries must be at least 1")
+    if level is not None and level not in LEVELS:
+        raise ResuError("Unknown search level", [f"choose one of: {', '.join(LEVELS)}"])
+    level_requested = level is not None
     prof = profile_mod.load()
     prefs = prof.get("preferences") or {}
     roles, role_source = _roles(prof, requested_roles or [])
@@ -128,7 +136,8 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         places = _unique(prefs.get("locations") or [])
         if work_mode == "any" and not any(norm_text(p).startswith("remote") for p in places):
             places.extend(_remote_places(prof))
-    level = _level(prof)
+    level = ({"hint": None if level == "any" else level, "basis": f"requested level: {level}"}
+             if level_requested else _level(prof))
     warnings = []
     if not roles:
         warnings.append("No target roles: ask the user which roles to search for, or add preferences.roles")
@@ -140,7 +149,7 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         warnings.append("No location preference; ask the user for a search city/region or pass --location")
     if work_mode is None:
         warnings.append("Work mode unknown; ask the user whether remote roles count")
-    if level["hint"] is None and any(not _LEVEL_WORDS.search(role) for role in roles):
+    if not level_requested and level["hint"] is None and any(not _LEVEL_WORDS.search(role) for role in roles):
         warnings.append(level["basis"])
 
     if query_skills:

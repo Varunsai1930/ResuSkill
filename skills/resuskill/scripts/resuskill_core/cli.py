@@ -84,7 +84,7 @@ def cmd_profile(args) -> None:
         out({"revision": prof["_meta"]["revision"], "changes": changes, "warnings": warnings}, args.json,
             text + (f"\nWarnings:\n{bullets(warnings)}" if warnings else ""))
     elif args.action == "search-terms":
-        result = search_mod.terms(args.role, args.location, args.max_queries, args.skill)
+        result = search_mod.terms(args.role, args.location, args.max_queries, args.skill, args.level)
         out(result, args.json, search_text(result))
 
 
@@ -382,6 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--role", action="append", help="target role from the user's request (repeatable)")
     x.add_argument("--location", action="append", help="location to search (repeatable)")
     x.add_argument("--skill", action="append", help="confirmed profile skill to put in queries (repeatable; default: top 3)")
+    x.add_argument("--level", choices=search_mod.LEVELS, help="desired career level for roles without one; any omits level filters")
     x.add_argument("--max-queries", type=int, default=6)
     p.set_defaults(func=cmd_profile)
 

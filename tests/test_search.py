@@ -304,3 +304,37 @@ class SearchTermsTests(IsolatedHome):
                     self.assertIsNone(result["level"]["hint"])
                     self.assertFalse(any("entry level" in q or "intern" in q for q in result["queries"]))
                     self.assertTrue(any("which level" in w for w in result["warnings"]))
+
+    def test_explicit_mid_level_and_management_titles_keep_their_level(self):
+        self.save()
+        for role in ("Mid-level Data Analyst", "Mid level Data Analyst", "Engineering Manager",
+                     "Director of Engineering", "Head of Data", "VP of Engineering"):
+            with self.subTest(role=role):
+                queries = search.terms([role])["queries"]
+                self.assertTrue(all(q.startswith(f'"{role}" ') for q in queries))
+                self.assertFalse(any("entry level" in q or "intern" in q for q in queries))
+
+    def test_requested_level_overrides_graduation_and_any_clears_filters(self):
+        self.save()
+        result = search.terms(["Data Analyst"], level="senior")
+        self.assertEqual(result["level"], {"hint": "senior", "basis": "requested level: senior"})
+        self.assertTrue(all('"Data Analyst" senior ' in q for q in result["queries"]))
+        result = search.terms(["Data Analyst"], level="any")
+        self.assertIsNone(result["level"]["hint"])
+        self.assertFalse(any("which level" in w for w in result["warnings"]))
+        self.assertFalse(any("entry level" in q or "intern" in q for q in result["queries"]))
+        with self.assertRaises(ResuError):
+            search.terms(level="made-up")
+
+    def test_cli_accepts_explicit_level_and_rejects_invalid_level(self):
+        self.save()
+        command = [sys.executable, str(ROOT / "skills/resuskill/scripts/resuskill.py"),
+                   "profile", "search-terms", "--role", "Data Analyst", "--json", "--level"]
+        result = subprocess.run(command + ["mid"], text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["level"]["hint"], "mid")
+        self.assertIn('"mid level"', output["queries"][0])
+        invalid = subprocess.run(command + ["made-up"], text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(invalid.returncode, 2)
+        self.assertNotIn("Traceback", invalid.stderr)
