@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Count using a SQL database (PostgreSQL, MySQL, SQLite ...) as evidence for an already confirmed SQL skill when ranking search skills, so SQL is no longer ranked last.
 - Remote searches name each country the user is authorized to work in (`Remote United States`), since a bare "Remote" mostly returned postings from other countries. SKILL.md tells the agent to open job-board search pages and list only individual postings.
 - Harden search terms: omit contact-address fallbacks, preserve remote-only filters with explicit locations, leave ambiguous graduation dates/levels Unknown, and prioritize ongoing/recent roles using available dates. Add regression coverage and align the agent instructions and command reference.
 - Add job finding: `profile search-terms` builds offline search queries from confirmed profile skills (ranked by supporting entries), roles, locations, work mode and graduation level, without contact details. SKILL.md tells the agent to search with its own web tool, list only postings it actually found, mark unopened ones unverified and save only postings the user picks.

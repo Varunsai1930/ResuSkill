@@ -27,6 +27,15 @@ class SearchTermsTests(IsolatedHome):
         self.assertEqual(result["skills_absent"], ["Rust"])
         self.assertEqual(result["query_skills"], names[:3])
 
+    def test_sql_database_use_counts_as_sql_evidence_only_when_sql_is_confirmed(self):
+        self.save()
+        counts = {s["name"]: s["evidence_count"] for s in search.terms()["skills"]}
+        self.assertEqual(counts["SQL"], 2)  # PostgreSQL at the internship, SQLite in the project
+        data = fixture("profile.json")
+        data["skills"] = [s for s in data["skills"] if s["name"] != "SQL"]
+        profile.save(data)
+        self.assertNotIn("SQL", [s["name"] for s in search.terms()["skills"]])
+
     def test_queries_use_preferences_and_never_contact_details(self):
         self.save()
         result = search.terms()
@@ -54,7 +63,7 @@ class SearchTermsTests(IsolatedHome):
     def test_role_with_level_word_gets_no_level_suffix(self):
         self.save()
         self.assertEqual(search.terms(["Data Analyst Intern"])["queries"][0],
-                         '"Data Analyst Intern" Python Flask PostgreSQL Austin')
+                         '"Data Analyst Intern" Python SQL Flask Austin')
 
     def test_missing_roles_fall_back_to_titles_with_warning(self):
         self.save(preferences={"roles": [], "locations": [], "work_mode": None})
@@ -84,7 +93,7 @@ class SearchTermsTests(IsolatedHome):
         profile.save(data)
         result = search.terms(["Analyst"])
         self.assertIsNone(result["level"]["hint"])
-        self.assertEqual(result["queries"][0], '"Analyst" Python Flask PostgreSQL Austin')
+        self.assertEqual(result["queries"][0], '"Analyst" Python SQL Flask Austin')
 
     def test_sponsorship_and_unknown_authorization_reported(self):
         self.save(authorization=[{"country": "US", "authorized": False, "requires_sponsorship": True},

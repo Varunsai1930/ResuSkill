@@ -15,6 +15,12 @@ from .util import ResuError, date_key, date_span, norm_text, today_key
 
 QUERY_SKILLS = 3
 
+# Using one of these in an entry is evidence of an already confirmed broader skill. Ranking only:
+# this never adds a skill the profile does not list.
+_IMPLIES = {canon(name): canon("SQL") for name in (
+    "PostgreSQL", "MySQL", "SQLite", "SQL Server", "Microsoft SQL Server", "T-SQL", "MariaDB",
+    "Oracle", "BigQuery", "Snowflake", "Redshift")}
+
 
 def _unique(values) -> list[str]:
     seen, result = set(), []
@@ -58,6 +64,7 @@ def ranked_skills(prof: dict) -> list[dict]:
         for entry in prof.get(section) or []:
             text = " ".join(b["text"] for b in entry.get("bullets") or [])
             used = {canon(t) for t in entry.get("technologies") or []} | find_terms(text, extra)
+            used |= {_IMPLIES[k] for k in used if k in _IMPLIES}
             for key in used & counts.keys():
                 counts[key] += 1
     order = {k: i for i, k in enumerate(names)}
