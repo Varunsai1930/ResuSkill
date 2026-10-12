@@ -93,7 +93,7 @@ def search_text(result: dict) -> str:
     level = result["level"]
     lines = [f"Roles ({result['role_source']}): {', '.join(result['roles']) or '-'}",
              f"Skills (entries using each): {skills}",
-             f"In queries: {', '.join(result['query_skills']) or '-'}",
+             f"In focused queries: {', '.join(result['query_skills']) or '-'}",
              f"Locations: {', '.join(result['locations']) or '-'} | work_mode: {result['work_mode'] or 'unknown'}",
              f"Level: {level['hint'] or 'unknown'} ({level['basis']})"]
     if result["skills_absent"]:
@@ -381,7 +381,7 @@ def build_parser() -> argparse.ArgumentParser:
     x = ps.add_parser("search-terms", parents=[common], help="job-search queries from the profile (offline)")
     x.add_argument("--role", action="append", help="target role from the user's request (repeatable)")
     x.add_argument("--location", action="append", help="location to search (repeatable)")
-    x.add_argument("--skill", action="append", help="confirmed profile skill to put in queries (repeatable; default: top 3)")
+    x.add_argument("--skill", action="append", help="confirmed profile skill to put in queries (repeatable; default: top 2; broader queries also omit skills)")
     x.add_argument("--level", choices=search_mod.LEVELS, help="desired career level for roles without one; any omits level filters")
     x.add_argument("--max-queries", type=int, default=6)
     p.set_defaults(func=cmd_profile)

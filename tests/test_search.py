@@ -25,7 +25,7 @@ class SearchTermsTests(IsolatedHome):
         self.assertEqual(result["skills"][0]["evidence_count"], 2)
         self.assertNotIn("Rust", names)
         self.assertEqual(result["skills_absent"], ["Rust"])
-        self.assertEqual(result["query_skills"], names[:3])
+        self.assertEqual(result["query_skills"], names[:2])
 
     def test_sql_database_use_counts_as_sql_evidence_only_when_sql_is_confirmed(self):
         self.save()
@@ -41,7 +41,7 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms()
         self.assertEqual(result["role_source"], "preferences")
         self.assertEqual(result["locations"], ["Austin", "Remote United States"])
-        self.assertEqual(len(result["queries"]), 4)
+        self.assertEqual(len(result["queries"]), 6)
         dumped = json.dumps(result)
         for private in ("Jordan", "jordan@example.com", "555 0100", "linkedin"):
             self.assertNotIn(private, dumped)
@@ -51,7 +51,7 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms(["Data Analyst"], ["Dallas, TX"], query_skills=["sql", "python"])
         self.assertEqual(result["role_source"], "request")
         self.assertEqual(result["query_skills"], ["SQL", "Python"])
-        self.assertEqual(result["queries"][0], '"Data Analyst" intern SQL Python Dallas, TX')
+        self.assertEqual(result["queries"][0], '"Data Analyst" intern SQL Python Dallas, TX jobs')
         self.assertEqual(result["locations"], ["Dallas, TX"])
 
     def test_query_skills_must_be_confirmed(self):
@@ -63,7 +63,7 @@ class SearchTermsTests(IsolatedHome):
     def test_role_with_level_word_gets_no_level_suffix(self):
         self.save()
         self.assertEqual(search.terms(["Data Analyst Intern"])["queries"][0],
-                         '"Data Analyst Intern" Python SQL Flask Austin')
+                         '"Data Analyst Intern" Python SQL Austin jobs')
 
     def test_missing_roles_fall_back_to_titles_with_warning(self):
         self.save(preferences={"roles": [], "locations": [], "work_mode": None})
@@ -93,7 +93,7 @@ class SearchTermsTests(IsolatedHome):
         profile.save(data)
         result = search.terms(["Analyst"])
         self.assertIsNone(result["level"]["hint"])
-        self.assertEqual(result["queries"][0], '"Analyst" Python SQL Flask Austin')
+        self.assertEqual(result["queries"][0], '"Analyst" Python SQL Austin jobs')
 
     def test_sponsorship_and_unknown_authorization_reported(self):
         self.save(authorization=[{"country": "US", "authorized": False, "requires_sponsorship": True},
@@ -172,7 +172,7 @@ class SearchTermsTests(IsolatedHome):
         self.assertEqual(len(result["queries"]), 4)
         for role in ("Data Analyst", "BI Analyst", "Analytics Engineer"):
             self.assertTrue(any(f'"{role}"' in q for q in result["queries"]), role)
-        self.assertTrue(any("14 queries left out" in w for w in result["warnings"]))
+        self.assertTrue(any("32 queries left out" in w for w in result["warnings"]))
         with self.assertRaises(ResuError):
             search.terms(max_queries=0)
 
@@ -343,17 +343,35 @@ class SearchTermsTests(IsolatedHome):
         self.save()
         result = search.terms(["Data Analyst"], ["Austin"], query_skills=["SQL", "Python"])
         self.assertEqual(result["queries"], [
-            '"Data Analyst" intern SQL Python Austin',
-            '"Data Analyst" "entry level" SQL Python Austin',
+            '"Data Analyst" intern SQL Python Austin jobs',
+            '"Data Analyst" "entry level" SQL Python Austin jobs',
+            '"Data Analyst" intern Austin jobs',
+            '"Data Analyst" "entry level" Austin jobs',
         ])
         self.assertFalse(any(" OR " in q for q in result["queries"]))
         capped = search.terms(["Data Analyst"], ["Austin"], max_queries=1)
         self.assertEqual(len(capped["queries"]), 1)
-        self.assertTrue(any("1 queries left out" in w for w in capped["warnings"]))
+        self.assertTrue(any("3 queries left out" in w for w in capped["warnings"]))
 
     def test_level_alternatives_do_not_repeat_explicit_level_titles(self):
         self.save()
-        result = search.terms(["Data Analyst", "Data Analyst Intern"], ["Austin"])
+        with mock.patch.object(search, "ranked_skills", return_value=[]):
+            result = search.terms(["Data Analyst", "Data Analyst Intern"], ["Austin"])
         self.assertEqual(len(result["queries"]), 3)
         self.assertEqual(sum(q.startswith('"Data Analyst Intern"') for q in result["queries"]), 1)
         self.assertEqual(len(set(result["queries"])), 3)
+
+    def test_default_queries_use_two_skills_and_include_broad_job_searches(self):
+        self.save()
+        result = search.terms(["Data Analyst"], ["Austin"])
+        self.assertEqual(result["query_skills"], ["Python", "SQL"])
+        self.assertNotIn("Flask", " ".join(result["queries"]))
+        self.assertTrue(all(q.endswith("Austin jobs") for q in result["queries"]))
+        self.assertIn('"Data Analyst" intern Austin jobs', result["queries"])
+        self.assertIn('"Data Analyst" "entry level" Austin jobs', result["queries"])
+
+    def test_no_skills_does_not_duplicate_broad_queries(self):
+        self.save(skills=[], experience=[], projects=[])
+        result = search.terms(["Analyst"], ["Austin"])
+        self.assertEqual(result["queries"], ['"Analyst" intern Austin jobs',
+                                             '"Analyst" "entry level" Austin jobs'])

@@ -13,7 +13,7 @@ from . import profile as profile_mod
 from .skills import canon, display, find_terms
 from .util import ResuError, date_key, date_span, norm_text, today_key
 
-QUERY_SKILLS = 3
+QUERY_SKILLS = 2
 
 # Using one of these in an entry is evidence of an already confirmed broader skill. Ranking only:
 # this never adds a skill the profile does not list.
@@ -167,14 +167,17 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     pairs.sort(key=lambda ij: (ij[0] + ij[1], ij[0]))  # within a diagonal, new roles before new places
     suffixes = [("",) if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], ("",)) for role in roles]
     queries = []
-    # Finish a round across roles/places before repeating them for another level alternative.
-    for variant in range(max(map(len, suffixes), default=0)):
-        for i, j in pairs:
-            if variant >= len(suffixes[j]):
-                continue
-            role, place = roles[j], (places or [""])[i]
-            remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
-            queries.append(" ".join(p for p in (f'"{role}"', suffixes[j][variant], top, place, remote) if p))
+    # Try focused queries first, then broader queries without skills so evidence frequency
+    # cannot hide relevant postings that use other tools. Every query states job-search intent.
+    for skill_terms in (top, "") if top else ("",):
+        # Finish a round across roles/places before repeating them for another level alternative.
+        for variant in range(max(map(len, suffixes), default=0)):
+            for i, j in pairs:
+                if variant >= len(suffixes[j]):
+                    continue
+                role, place = roles[j], (places or [""])[i]
+                remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
+                queries.append(" ".join(p for p in (f'"{role}"', suffixes[j][variant], skill_terms, place, remote, "jobs") if p))
     if len(queries) > max_queries:
         warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
                         "raise it or narrow roles/locations to search them")
