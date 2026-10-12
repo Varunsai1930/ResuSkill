@@ -50,3 +50,6 @@ In addition to the scored cases, exercise job finding with fictional profiles an
 - Include an employer posting and an aggregator copy with the same requisition ID, plus a second requisition with the same title. Keep one copy of the first and retain the distinct second job.
 - Offer a strong skills match that requires onsite New York while the user requests Austin or US remote. Exclude it; also check program dates and explicit graduation/availability windows before calling a student role a match.
 - Leave a deadline, remote country or graduation window unstated. Report it as Unknown rather than infer eligibility from the title or search snippet.
+
+- Give a public posting whose text fetch is a JavaScript placeholder but whose normal browser page renders a description. Use the available browser, verify the rendered location and dates, and count it as opened only after reading that body.
+- Give a login, CAPTCHA, access-denied page or a browser that never loads the description. Do not bypass barriers or fill forms; keep the lead unverified and do not claim requirements from snippets.
