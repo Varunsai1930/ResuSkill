@@ -29,11 +29,12 @@ _AUTH = re.compile(
     r"legally (?:able|permitted|allowed|entitled) to work)"
 )
 _AUTH_PROMPT = re.compile(
-    r"are you (?:legally )?(?:authori[sz]ed|eligible|able|permitted|allowed|entitled) to work"
+    r"are you (?:currently )?(?:legally )?(?:authori[sz]ed|eligible|able|permitted|allowed|entitled) to work"
     r"(?: (?:in .+|for any employer))?"
 )
 _SPONSOR_PROMPT = re.compile(
-    r"(?:will|do) you (?:now or in the future )?(?:require|need) "
+    # Also the common form "Do you now, or will you in the future, require ...".
+    r"(?:(?:will|do) you (?:now or in the future )?|do you now,? or will you in the future,? )(?:require|need) "
     r"(?:visa |employment )?sponsorship(?: (?:now or in the future|to work in .+|in .+))?"
 )
 # Match entire field labels; a keyword inside a different question is not a field.
@@ -70,7 +71,7 @@ def _prompt(text: str) -> str:
 # Match the entire location clause after "in", so the pronoun "us" elsewhere
 # never selects the US and ambiguous/unknown country wording stays unanswered.
 _COUNTRIES = {
-    "US": ("united states", "u s", "usa", "america"),
+    "US": ("united states", "united states of america", "u s", "u s a", "usa", "america"),
     "CA": ("canada",),
     "GB": ("united kingdom", "uk", "britain", "england"),
     "IN": ("india",),

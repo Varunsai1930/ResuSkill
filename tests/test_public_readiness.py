@@ -307,7 +307,10 @@ class CodeReviewRegressionTests(IsolatedHome):
                               ("Are you legally authorized to work in the United States for any employer?", "US"),
                               ("Are you authorized to work in Canada?", "CA"),
                               ("Will you require sponsorship now or in the future?", None),
-                              ("Will you require sponsorship to work in the US and Canada?", None)):
+                              ("Will you require sponsorship to work in the US and Canada?", None),
+                              # Greenhouse's default wording.
+                              ("Do you now, or will you in the future, require visa sponsorship to work in the United States?", "US"),
+                              ("Are you currently eligible to work in the United States of America?", "US")):
             with self.subTest(text=text):
                 self.assertEqual(questions.classify(text)[0], questions.SENSITIVE_FACTUAL)
                 record = questions._country(text, prof)
