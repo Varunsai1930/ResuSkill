@@ -288,3 +288,19 @@ class SearchTermsTests(IsolatedHome):
     def test_requires_profile(self):
         with self.assertRaises(ResuError):
             search.terms()
+
+    def test_recent_additional_degree_does_not_reset_career_level(self):
+        with mock.patch.object(search, "today_key", return_value=(2026, 10, 12)):
+            for field in ("end", "graduation"):
+                with self.subTest(field=field):
+                    self.save(education=[
+                        {"institution": "First University", "degree": "B.S.", "end": "2010-05"},
+                        {"institution": "Second University", "degree": "M.S.", field: "2026-09"},
+                    ], experience=[
+                        {"organization": "Example Co", "title": "Senior Software Engineer",
+                         "start": "2011", "end": "present"},
+                    ])
+                    result = search.terms(["Software Engineer"])
+                    self.assertIsNone(result["level"]["hint"])
+                    self.assertFalse(any("entry level" in q or "intern" in q for q in result["queries"]))
+                    self.assertTrue(any("which level" in w for w in result["warnings"]))

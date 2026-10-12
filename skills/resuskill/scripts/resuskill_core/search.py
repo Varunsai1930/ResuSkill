@@ -80,14 +80,13 @@ def _level(prof: dict) -> dict:
     today = today_key()
     if span[0] <= today <= span[1]:
         return {"hint": None, "basis": f"graduation date {grad} does not establish completion; ask the user which level to search"}
+    # A further degree, whether ongoing or recently completed, does not establish career level.
+    # High school and associate degrees before a transfer do not suppress a first-degree hint.
+    finished = [date_span(e.get("graduation") or e.get("end")) for e in prof.get("education") or []
+                if (jobs_mod.degree_level(e.get("degree", "")) or 0) >= 1]
+    if any(sp and sp[1] < min(today, span[0]) for sp in finished):
+        return {"hint": None, "basis": f"additional degree dated {grad} after a completed one; ask the user which level to search"}
     if span[0] > today:
-        # Only a finished bachelor's or higher counts; high school or an associate degree before
-        # a transfer does not make a current student experienced.
-        finished = [date_span(e.get("graduation") or e.get("end")) for e in prof.get("education") or []
-                    if (jobs_mod.degree_level(e.get("degree", "")) or 0) >= 1]
-        if any(sp and sp[1] < today for sp in finished):
-            # A further degree after a completed one (part-time master's, MBA) says nothing about level.
-            return {"hint": None, "basis": f"pursuing a degree until {grad} after a completed one; ask the user which level to search"}
         return {"hint": "student", "basis": f"expected graduation {grad}"}
     year_ago = (today[0] - 1, today[1], today[2])
     if span[1] >= year_ago:
