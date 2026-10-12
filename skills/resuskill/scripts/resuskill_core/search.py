@@ -7,6 +7,7 @@ includes contact details, so queries do not reveal who the user is.
 from __future__ import annotations
 
 import re
+from itertools import islice
 
 from . import jobs as jobs_mod
 from . import profile as profile_mod
@@ -117,6 +118,15 @@ _LEVEL_WORDS = re.compile(
     r"manager|director|head|executive|vp|vice president)\b", re.I)
 
 
+def _pairs(place_count: int, role_count: int):
+    """Yield a diagonal prefix without allocating or sorting the Cartesian product."""
+    for diagonal in range(place_count + role_count - 1):
+        first = max(0, diagonal - role_count + 1)
+        last = min(place_count - 1, diagonal)
+        for i in range(first, last + 1):
+            yield i, diagonal - i
+
+
 def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skills=None, level=None) -> dict:
     if max_queries < 1:
         raise ResuError("--max-queries must be at least 1")
@@ -161,25 +171,25 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     else:
         chosen = [s["name"] for s in skills[:QUERY_SKILLS]]
     top = " ".join(chosen)
-    # Diagonal order over (place, role) pairs so a query cap still covers every role and place
-    # as far as the cap allows, instead of dropping the last role or place (often Remote) whole.
-    pairs = [(i, j) for i in range(len(places or [""])) for j in range(len(roles))]
-    pairs.sort(key=lambda ij: (ij[0] + ij[1], ij[0]))  # within a diagonal, new roles before new places
+    query_places = places or [""]
     suffixes = [("",) if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], ("",)) for role in roles]
-    queries = []
-    # Try focused queries first, then broader queries without skills so evidence frequency
-    # cannot hide relevant postings that use other tools. Every query states job-search intent.
-    for skill_terms in (top, "") if top else ("",):
-        # Finish a round across roles/places before repeating them for another level alternative.
-        for variant in range(max(map(len, suffixes), default=0)):
-            for i, j in pairs:
-                if variant >= len(suffixes[j]):
-                    continue
-                role, place = roles[j], (places or [""])[i]
-                remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
-                queries.append(" ".join(p for p in (f'"{role}"', suffixes[j][variant], skill_terms, place, remote, "jobs") if p))
-    if len(queries) > max_queries:
-        warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
+    skill_variants = (top, "") if top else ("",)
+    total = len(query_places) * sum(map(len, suffixes)) * len(skill_variants)
+
+    def planned_queries():
+        # Focused before broad, and roles/places before alternative levels. Build only the cap.
+        for skill_terms in skill_variants:
+            for variant in range(max(map(len, suffixes), default=0)):
+                for i, j in _pairs(len(query_places), len(roles)):
+                    if variant >= len(suffixes[j]):
+                        continue
+                    role, place = roles[j], query_places[i]
+                    remote = "Remote" if work_mode == "remote" and not re.search(r"\bremote\b", place, re.I) else ""
+                    yield " ".join(p for p in (f'"{role}"', suffixes[j][variant], skill_terms, place, remote, "jobs") if p)
+
+    queries = list(islice(planned_queries(), max_queries))
+    if total > max_queries:
+        warnings.append(f"{total - max_queries} queries left out by --max-queries {max_queries}; "
                         "raise it or narrow roles/locations to search them")
     return {
         "roles": roles,
@@ -193,6 +203,6 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         "sponsorship_needed": [a["country"] for a in prof.get("authorization") or [] if a.get("requires_sponsorship") is True],
         "authorization_unknown": [a["country"] for a in prof.get("authorization") or []
                                   if a.get("authorized") is None or a.get("requires_sponsorship") is None],
-        "queries": queries[:max_queries],
+        "queries": queries,
         "warnings": warnings,
     }

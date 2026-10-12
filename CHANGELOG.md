@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Improve job finding: explicit `--level`, preserve management/mid-level targets and avoid entry-level inference after additional degrees; separate student alternatives, use two confirmed skills plus broader job queries, verify and deduplicate employer postings, and read public JavaScript pages with an available browser. Generate capped plans lazily without allocating the full role/location product.
 - Recognise Greenhouse's default authorization wording ("Do you now, or will you in the future, require visa sponsorship ...", "Are you currently eligible to work in the United States of America?") as profile-backed questions instead of sensitive ones.
 - Count using a SQL database (PostgreSQL, MySQL, SQLite ...) as evidence for an already confirmed SQL skill when ranking search skills, so SQL is no longer ranked last.
 - Remote searches name each country the user is authorized to work in (`Remote United States`), since a bare "Remote" mostly returned postings from other countries. SKILL.md tells the agent to open job-board search pages and list only individual postings.

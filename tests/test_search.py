@@ -2,6 +2,7 @@ import copy
 import json
 import subprocess
 import sys
+import tracemalloc
 from datetime import date
 from unittest import mock
 
@@ -375,3 +376,35 @@ class SearchTermsTests(IsolatedHome):
         result = search.terms(["Analyst"], ["Austin"])
         self.assertEqual(result["queries"], ['"Analyst" intern Austin jobs',
                                              '"Analyst" "entry level" Austin jobs'])
+
+    def test_capped_queries_preserve_diagonal_order_and_omission_count(self):
+        roles, places = ["Analyst", "Engineer", "Designer"], ["Austin", "Dallas", "Houston"]
+        self.save(skills=[], experience=[], projects=[],
+                  preferences={"roles": roles, "locations": places, "work_mode": "onsite"})
+        expected = [f'"{roles[j]}" {places[i]} jobs' for i, j in
+                    ((0, 0), (0, 1), (1, 0), (0, 2), (1, 1), (2, 0), (1, 2), (2, 1), (2, 2))]
+        for cap in (1, 4, 9, 20):
+            with self.subTest(cap=cap):
+                result = search.terms(max_queries=cap, level="any")
+                self.assertEqual(result["queries"], expected[:cap])
+                omitted = [w for w in result["warnings"] if "queries left out" in w]
+                if cap < 9:
+                    self.assertTrue(omitted[0].startswith(f"{9 - cap} queries left out"))
+                else:
+                    self.assertEqual(omitted, [])
+
+    def test_large_capped_plan_avoids_cartesian_memory_allocation(self):
+        self.save()
+        prof = profile.load()
+        prof["preferences"] = {"roles": [f"Role {i}" for i in range(300)],
+                               "locations": [f"City {i}" for i in range(300)], "work_mode": "onsite"}
+        with mock.patch.object(profile, "load", return_value=prof):
+            tracemalloc.start()
+            try:
+                result = search.terms(max_queries=6, level="any")
+                peak = tracemalloc.get_traced_memory()[1]
+            finally:
+                tracemalloc.stop()
+        self.assertEqual(len(result["queries"]), 6)
+        self.assertTrue(any("179994 queries left out" in w for w in result["warnings"]))
+        self.assertLess(peak, 2 * 1024 * 1024)
