@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from . import jobs as jobs_mod
 from . import profile as profile_mod
 from .skills import canon, display, find_terms
 from .util import ResuError, date_key, date_span, norm_text, today_key
@@ -18,7 +19,7 @@ QUERY_SKILLS = 3
 def _unique(values) -> list[str]:
     seen, result = set(), []
     for value in values:
-        text = re.sub(r"\s+", " ", str(value or "").replace('"', " ")).strip()
+        text = re.sub(r"\s+", " ", re.sub(r'["\u201c\u201d\u201e\u201f\u2033]', " ", str(value or ""))).strip()
         if text and norm_text(text) not in seen:
             seen.add(norm_text(text))
             result.append(text)
@@ -40,10 +41,14 @@ def _roles(prof: dict, requested: list[str]) -> tuple[list[str], str]:
     return titles[:2], "experience titles" if titles else "none"
 
 
+_STREET = re.compile(r"\b(street|st|road|rd|avenue|ave|lane|ln|drive|dr|boulevard|blvd|way|court|ct|place|pl|"
+                     r"apartments?|apt|suite|ste|unit|floor|flat|building|bldg|house|po box)\b", re.I)
+
+
 def _city(location) -> str:
     """The city/region part of a contact location, without street lines or postal codes."""
     parts = [p.strip() for p in str(location or "").split(",")]
-    kept = [p for p in parts if p and not re.search(r"\d", p)]
+    kept = [p for p in parts if p and not re.search(r"\d", p) and not _STREET.search(p)]
     return ", ".join(kept[-2:])
 
 
@@ -77,8 +82,11 @@ def _level(prof: dict) -> dict:
         return {"hint": None, "basis": "graduation date unknown; ask the user which level to search"}
     today = today_key()
     if span[0] > today:
-        spans = [date_span(e.get("end")) for e in prof.get("education") or []]
-        if any(sp and sp[1] < today for sp in spans):
+        # Only a finished bachelor's or higher counts; high school or an associate degree before
+        # a transfer does not make a current student experienced.
+        finished = [date_span(e.get("graduation") or e.get("end")) for e in prof.get("education") or []
+                    if (jobs_mod.degree_level(e.get("degree", "")) or 0) >= 1]
+        if any(sp and sp[1] < today for sp in finished):
             # A further degree after a completed one (part-time master's, MBA) says nothing about level.
             return {"hint": None, "basis": f"pursuing a degree until {grad} after a completed one; ask the user which level to search"}
         return {"hint": "student", "basis": f"expected graduation {grad}"}
@@ -100,12 +108,13 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     roles, role_source = _roles(prof, requested_roles or [])
     skills = ranked_skills(prof)
     work_mode = prefs.get("work_mode")
+    contact_location = (prof.get("contact") or {}).get("location")
     if locations:
         places = _unique(locations)  # the user's request: search exactly these
     elif work_mode == "remote":
         places = ["Remote"]
     else:
-        places = _unique(prefs.get("locations") or [_city((prof.get("contact") or {}).get("location"))])
+        places = _unique(prefs.get("locations") or [_city(contact_location)])
         if work_mode == "any" and "remote" not in {norm_text(p) for p in places}:
             places.append("Remote")
     level = _level(prof)
@@ -116,7 +125,10 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
         warnings.append("No preferences.roles; roles come from past job titles. Confirm them with the user")
     if not skills:
         warnings.append("No confirmed skills in the profile; queries use roles only")
-    if not places:
+    if not places and contact_location and not prefs.get("locations"):
+        warnings.append("Contact location has no usable city (street or postal code only were removed); "
+                        "ask the user where to search")
+    elif not places:
         warnings.append("No location preference or contact location; ask the user where to search")
     if work_mode is None:
         warnings.append("Work mode unknown; ask the user whether remote roles count")
@@ -130,12 +142,15 @@ def terms(requested_roles=None, locations=None, max_queries: int = 6, query_skil
     else:
         chosen = [s["name"] for s in skills[:QUERY_SKILLS]]
     top = " ".join(chosen)
-    # Place-major order so a query cap trims places evenly instead of dropping whole roles.
+    # Diagonal order over (place, role) pairs so a query cap still covers every role and place
+    # as far as the cap allows, instead of dropping the last role or place (often Remote) whole.
+    pairs = [(i, j) for i in range(len(places or [""])) for j in range(len(roles))]
+    pairs.sort(key=lambda ij: (ij[0] + ij[1], ij[0]))  # within a diagonal, new roles before new places
     queries = []
-    for place in places or [""]:
-        for role in roles:
-            suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
-            queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place) if p))
+    for i, j in pairs:
+        role, place = roles[j], (places or [""])[i]
+        suffix = "" if _LEVEL_WORDS.search(role) else _LEVEL_TERMS.get(level["hint"], "")
+        queries.append(" ".join(p for p in (f'"{role}"', suffix, top, place) if p))
     if len(queries) > max_queries:
         warnings.append(f"{len(queries) - max_queries} queries left out by --max-queries {max_queries}; "
                         "raise it or narrow roles/locations to search them")

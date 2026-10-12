@@ -154,7 +154,42 @@ class SearchTermsTests(IsolatedHome):
 
     def test_quotes_in_roles_are_removed(self):
         self.save()
-        self.assertTrue(search.terms(['Analyst "Data"'])["queries"][0].startswith('"Analyst Data" '))
+        for role in ('Analyst "Data"', "Analyst \u201cData\u201d"):
+            self.assertTrue(search.terms([role])["queries"][0].startswith('"Analyst Data" '), role)
+
+    def test_high_school_or_associate_keeps_student_hint(self):
+        data = fixture("profile.json")
+        for degree in ("High School Diploma", "A.A."):
+            earlier = copy.deepcopy(data["education"][0])
+            earlier.update(degree=degree, field="", start="2019-08", end="2023-05")
+            data["education"].append(earlier)
+        profile.save(data)
+        self.assertEqual(search.terms()["level"]["hint"], "student")
+
+    def test_query_cap_keeps_remote_and_every_role(self):
+        self.save(preferences={"roles": ["Data Analyst", "BI Analyst", "Analytics Engineer"],
+                               "locations": ["Austin", "Dallas"], "work_mode": "any"})
+        queries = search.terms(max_queries=6)["queries"]
+        for term in ("Data Analyst", "BI Analyst", "Analytics Engineer", "Austin", "Dallas", "Remote"):
+            self.assertTrue(any(term in q for q in queries), term)
+
+    def test_street_names_without_numbers_are_dropped(self):
+        data = fixture("profile.json")
+        data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
+        for location, city in (("Baker Street, London", "London"),
+                               ("Rosewood Apartments, Austin, TX", "Austin, TX")):
+            data["contact"]["location"] = location
+            profile.save(copy.deepcopy(data))
+            self.assertEqual(search.terms()["locations"], [city], location)
+
+    def test_filtered_contact_location_gets_specific_warning(self):
+        data = fixture("profile.json")
+        data["contact"]["location"] = "560001"
+        data["preferences"] = {"roles": ["Analyst"], "locations": [], "work_mode": "onsite"}
+        profile.save(data)
+        result = search.terms()
+        self.assertEqual(result["locations"], [])
+        self.assertTrue(any("no usable city" in w for w in result["warnings"]))
 
     def test_requires_profile(self):
         with self.assertRaises(ResuError):
