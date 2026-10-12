@@ -40,7 +40,18 @@ _CREDENTIALS = {
     "master's degree": r"master'?s|masters?\s+of|m\.(?:s|a|sc|eng|tech)\.?|msc|m\.?tech|meng",
     "mba": r"mba",
     "degree": r"degree",
-    "professional credential": r"\b(?:cpa|pmp|cfa|cissp|ccna)\b",
+    # Distinct qualifications must not provide evidence for each other, whether
+    # written as an acronym or spelled out.
+    "CPA": r"cpa|certified public accountant",
+    "PMP": r"pmp|project management professional",
+    "CFA": r"cfa|chartered financial analyst",
+    "CISSP": r"cissp|certified information systems security professional",
+    "CCNA": r"ccna|cisco certified network associate",
+    # Progress toward a credential must not back a claim of holding it.
+    "CFA Level I": r"cfa level (?:i|1)",
+    "CFA Level II": r"cfa level (?:ii|2)",
+    "CFA Level III": r"cfa level (?:iii|3)",
+    "charterholder": r"charter\s?holders?|cfa charter",
     "publication": r"publish(?:ed|ing)?|publications?|peer[- ]reviewed",
     "honor": r"cum laude|dean'?s list|scholarship|fellowship|valedictorian",
 }

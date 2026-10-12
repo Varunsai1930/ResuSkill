@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 from helpers import ROOT, IsolatedHome
 
@@ -12,6 +13,31 @@ from resuskill_core.util import ResuError
 
 
 class ChecklistMatchingTests(unittest.TestCase):
+    def test_degree_status_requires_unambiguous_dates(self):
+        prof = {"education": [{"id": "edu-1", "institution": "University", "degree": "BS"}]}
+        criterion = {"level": "bachelor", "fields": [], "status": "pursuing"}
+        # The current year/month could describe a past or future graduation.
+        cases = [
+            ("2026", checklist.UNKNOWN, checklist.UNKNOWN),
+            ("2026-10", checklist.UNKNOWN, checklist.UNKNOWN),
+            ("2025", checklist.UNKNOWN, checklist.MET),
+            ("2026-09", checklist.UNKNOWN, checklist.MET),
+            ("2027", checklist.MET, checklist.UNKNOWN),
+            ("2026-11", checklist.MET, checklist.UNKNOWN),
+            ("2026-10-10", checklist.UNKNOWN, checklist.MET),
+            ("2026-10-11", checklist.UNKNOWN, checklist.MET),
+            ("2026-10-12", checklist.MET, checklist.UNKNOWN),
+            ("present", checklist.MET, checklist.UNKNOWN),
+            (None, checklist.UNKNOWN, checklist.UNKNOWN),
+        ]
+        with patch("resuskill_core.checklist.today_key", return_value=(2026, 10, 11)):
+            for end, pursuing, completed in cases:
+                prof["education"][0]["end"] = end
+                for status, expected in (("pursuing", pursuing), ("completed", completed), ("any", checklist.MET)):
+                    with self.subTest(end=end, status=status):
+                        criterion["status"] = status
+                        self.assertEqual(checklist._degree(criterion, prof)[0], expected)
+
     def test_degree_field_needs_whole_words(self):
         self.assertFalse(checklist._field_matches("Economics", ["CS"]))
         self.assertFalse(checklist._field_matches("Art", ["Computer Science and Artificial Intelligence"]))
@@ -62,6 +88,13 @@ class RequirementIdTests(IsolatedHome):
             profile.save({"contact": {"name": "A"}, "preferences": {"roles": "Backend Engineer"}})
 
 class FabricationCheckTests(unittest.TestCase):
+    def test_professional_credentials_are_not_interchangeable(self):
+        for source in ("CPA", "PMP", "CFA", "CISSP", "CCNA"):
+            for claim in ("CPA", "PMP", "CFA", "CISSP", "CCNA"):
+                with self.subTest(source=source, claim=claim):
+                    problems = validate.claim_problems(claim.lower(), [source], set(), ())
+                    self.assertEqual(bool(problems), source != claim)
+
     def test_slash_separated_technologies_are_detected(self):
         self.assertEqual(skills.find_terms("Built APIs in Python/Django"), {"python", "django"})
         self.assertEqual(skills.find_terms("C/C++ and CI/CD"), {"c", "c++", "continuous integration"})
@@ -83,6 +116,42 @@ class FabricationCheckTests(unittest.TestCase):
 
 
 class ProfileIdTests(IsolatedHome):
+    def test_identical_certification_input_keeps_approved_package_valid(self):
+        data = {"contact": {"name": "A"}, "certifications": [{"name": "CPA", "issuer": "Board", "date": "2020"}]}
+        first, _, _ = profile.save(data)
+        job_id = jobs.add("Co", "Role", "Accounting")["id"]
+        jobs.set_requirements(job_id, [])
+        package.propose_resume(job_id, {"summary": {"text": "CPA", "sources": ["cert-1"]}})
+        package.accept_resume(job_id)
+        package.approve(job_id)
+        again, changes, _ = profile.save(data)
+        self.assertEqual(again, first)
+        self.assertEqual(changes, [])
+        self.assertEqual(package.check(job_id)[0], [])
+        self.assertEqual(package.review_state(jobs.load(job_id), package.load(job_id), again), package.APPROVED)
+
+    def test_certification_ids_survive_reordering_and_are_not_reissued(self):
+        data = {"contact": {"name": "A"}, "certifications": [{"name": "CPA"}, {"name": "PMP"}]}
+        profile.save(data)
+        data["certifications"].reverse()
+        reordered, _, _ = profile.save(data)
+        self.assertEqual([c["id"] for c in reordered["certifications"]], ["cert-2", "cert-1"])
+        data["certifications"] = [{"name": "PMP"}]
+        profile.save(data)
+        data["certifications"].append({"name": "CFA"})
+        changed, _, _ = profile.save(data)
+        self.assertEqual([c["id"] for c in changed["certifications"]], ["cert-2", "cert-3"])
+
+    def test_matching_certifications_preserve_distinct_and_explicit_ids(self):
+        data = {"contact": {"name": "A"}, "certifications": [{"name": "CPA"}, {"name": "CPA"}]}
+        first, _, _ = profile.save(data)
+        again, _, _ = profile.save(data)
+        self.assertEqual(again, first)
+        # An implicit match must not consume an ID explicitly supplied later.
+        data["certifications"][1]["id"] = "cert-1"
+        reserved, _, _ = profile.save(data)
+        self.assertEqual([c["id"] for c in reserved["certifications"]], ["cert-2", "cert-1"])
+
     def test_deleted_bullet_id_is_not_reused(self):
         profile.save({"contact": {"name": "A"}, "experience": [{"organization": "O", "title": "T", "start": "2020", "bullets": ["a", "b", "c"]}]})
         data = profile.load()
@@ -104,6 +173,38 @@ class ProfileIdTests(IsolatedHome):
         changes = profile.diff(profile.load(), new)
         self.assertIn("~ certifications.cert-1.date: 2023-05 -> 2021-05", changes)
         self.assertIn("~ skill Python.category: Languages -> Tools", changes)
+
+class CredentialApprovalTests(IsolatedHome):
+    def setUp(self):
+        super().setUp()
+        profile.save({"contact": {"name": "A"}, "certifications": [{"name": "CPA"}]})
+        self.job_id = jobs.add("Co", "Role", "Accounting")["id"]
+        jobs.set_requirements(self.job_id, [])
+
+    def test_invented_credential_is_rejected_in_resume_and_answer(self):
+        with self.assertRaises(ResuError):
+            package.propose_resume(self.job_id, {"summary": {"text": "PMP", "sources": ["cert-1"]}})
+        question = package.add_question(self.job_id, "Why do you want this role?", True, None, "chars", None)
+        with self.assertRaises(ResuError):
+            package.propose_answers(self.job_id, [{"question_id": question["id"], "text": "PMP", "sources": ["cert-1"]}])
+
+    def test_existing_unsupported_resume_cannot_be_reapproved(self):
+        package.propose_resume(self.job_id, {"summary": {"text": "CPA", "sources": ["cert-1"]}})
+        package.accept_resume(self.job_id)
+        pkg = package.load(self.job_id)
+        pkg["resume"]["summary"]["text"] = "PMP"
+        package.save(self.job_id, pkg)
+        self.assertTrue(package.check(self.job_id)[0])
+        with self.assertRaises(ResuError):
+            package.approve(self.job_id)
+
+    def test_previous_validation_policy_approval_becomes_stale(self):
+        package.propose_resume(self.job_id, {"certifications": ["cert-1"]})
+        package.accept_resume(self.job_id)
+        with patch.object(package, "VALIDATION_VERSION", 2):
+            package.approve(self.job_id)
+        self.assertEqual(package.review_state(jobs.load(self.job_id), package.load(self.job_id), profile.load()), package.STALE)
+
 
 class AuthorizationQuestionTests(unittest.TestCase):
     PROF = {"authorization": [{"country": "US", "authorized": True, "requires_sponsorship": False}]}
@@ -202,3 +303,46 @@ class EncodingTests(IsolatedHome):
         self.run_cli("job", "add", "--company", "Co", "--title", "Eng", "--description-file", "-", stdin=description.encode("utf-8"))
         shown = self.run_cli("job", "show", "co-eng", "--description").stdout.decode("utf-8")
         self.assertEqual(shown.strip(), description)
+
+
+class SecondReviewRegressionTests(IsolatedHome):
+    def test_spelled_out_and_partial_credentials_need_their_own_evidence(self):
+        for claim, source in (("Project Management Professional", "CPA certification"),
+                              ("Chartered Financial Analyst", "CPA"),
+                              ("CFA charterholder", "CFA Level I candidate"),
+                              ("Passed CFA Level III", "Passed CFA Level I")):
+            with self.subTest(claim=claim):
+                self.assertTrue(validate.claim_problems(claim, [source], set(), ()))
+        self.assertEqual(validate.claim_problems("Certified Public Accountant", ["CPA certification"], set(), ()), [])
+
+    def test_damaged_job_files_are_listed_as_unreadable(self):
+        from resuskill_core import store, track
+
+        for name, content in (("partial", '{"id": "partial"}'), ("empty", "{}")):
+            folder = store.jobs_dir() / name
+            folder.mkdir()
+            (folder / "job.json").write_text(content, encoding="utf-8")
+        rows = {r["id"]: r for r in track.rows()}
+        self.assertEqual((rows["partial"]["review"], rows["empty"]["review"]), ("unreadable", "unreadable"))
+        with self.assertRaises(ResuError):
+            jobs.load("partial")
+
+    def test_corrected_certification_keeps_its_id(self):
+        data = {"contact": {"name": "A"}, "certifications": [{"name": "CPA", "issuer": "Board", "date": "2020"}]}
+        profile.save(data)
+        data["certifications"] = [{"name": "CPA", "issuer": "State Board", "date": "2021"},
+                                  {"name": "CPA", "issuer": "Board", "date": "2020"}]
+        saved, _, _ = profile.save(data)
+        # The unchanged record keeps cert-1; the corrected duplicate gets a new ID.
+        self.assertEqual([c["id"] for c in saved["certifications"]], ["cert-2", "cert-1"])
+        data["certifications"] = [{"name": "CPA", "issuer": "Board", "date": "2019"}]
+        corrected, _, _ = profile.save(data)
+        self.assertEqual([c["id"] for c in corrected["certifications"]], ["cert-1"])
+
+    def test_today_is_the_local_calendar_day(self):
+        import datetime as dt
+        from resuskill_core import util
+
+        self.assertEqual(util.today_key(), dt.date.today().timetuple()[:3])
+        self.assertEqual(util.date_span("2024-02"), ((2024, 2, 1), (2024, 2, 29)))
+        self.assertIsNone(util.date_span("not a date"))

@@ -72,8 +72,7 @@ def date_key(value, end_of_period: bool = False) -> tuple[int, int, int] | None:
     if value in (None, ""):
         return None
     if value == "present":
-        today = datetime.now(timezone.utc)
-        return (today.year, today.month, today.day)
+        return today_key()
     match = _DATE_RE.match(str(value))
     if not match or not is_valid_date(value):
         return None
@@ -83,8 +82,15 @@ def date_key(value, end_of_period: bool = False) -> tuple[int, int, int] | None:
     return (year, month, day)
 
 
+def date_span(value) -> tuple[tuple[int, int, int], tuple[int, int, int]] | None:
+    """First and last day a partial date can mean ("2026" spans the whole year)."""
+    earliest, latest = date_key(value), date_key(value, end_of_period=True)
+    return (earliest, latest) if earliest and latest else None
+
+
 def today_key() -> tuple[int, int, int]:
-    today = datetime.now(timezone.utc)
+    # The user's calendar day, not UTC: profile dates are written in local terms.
+    today = date.today()
     return (today.year, today.month, today.day)
 
 

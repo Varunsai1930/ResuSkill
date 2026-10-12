@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 from . import SCHEMA_VERSION, store, input_schema
-from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
+from .util import ResuError, is_valid_date, norm_text, now_iso, slugify
 
 CATEGORIES = {"skill", "education", "experience", "location", "authorization", "availability", "other"}
 IMPORTANCE = {"required", "preferred", "unspecified"}
@@ -23,8 +23,18 @@ def load(job_id: str) -> dict:
     job = store.read_json(store.job_dir(job_id) / "job.json")
     if job is None:
         raise ResuError(f"Job {job_id!r} is missing job.json")
-    store.check_version(job, "job")
+    _check_stored(job)
     return job
+
+
+def _check_stored(job) -> None:
+    """Refuse a damaged job.json before any command reads its fields."""
+    store.check_version(job, "job")
+    missing = [k for k in ("id", "company", "title", "tracking") if k not in job]
+    if not missing and not (isinstance(job["tracking"], dict) and "status" in job["tracking"]):
+        missing = ["tracking.status"]
+    if missing:
+        raise ResuError(f"Stored job is missing {', '.join(missing)}; restore a valid backup")
 
 
 def save(job: dict) -> None:
@@ -42,14 +52,14 @@ def list_jobs(problems: list[tuple[str, str]] | None = None) -> list[dict]:
             continue
         try:
             data = store.read_json(path / "job.json")
-            if data is not None:
-                store.check_version(data, "job")
+            if data is None:
+                continue
+            _check_stored(data)
         except ResuError as exc:
             if problems is not None:
                 problems.append((path.name, str(exc)))
             continue
-        if data:
-            jobs.append(data)
+        jobs.append(data)
     return sorted(jobs, key=lambda j: j.get("created_at", ""), reverse=True)
 
 
@@ -261,10 +271,3 @@ def degree_level(degree: str) -> int | None:
         if any(padded.startswith(n) or f" {n}" in f" {padded}" for n in needles):
             return level
     return None
-
-
-def is_future(date_value) -> bool:
-    key = date_key(date_value, end_of_period=True)
-    from .util import today_key
-
-    return bool(key) and key > today_key()

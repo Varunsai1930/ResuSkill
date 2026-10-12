@@ -12,7 +12,7 @@ import re
 from . import jobs as jobs_mod
 from . import profile as profile_mod
 from .skills import canon
-from .util import ResuError, content_hash, date_key, norm_text, now_iso
+from .util import ResuError, content_hash, date_key, date_span, norm_text, now_iso, today_key
 
 MET, UNMET, UNKNOWN = "met", "unmet", "unknown"
 STATUSES = (MET, UNMET, UNKNOWN)
@@ -55,16 +55,26 @@ def _degree(crit: dict, prof: dict) -> tuple[str, str]:
         return UNKNOWN, "No education in profile"
     needed = jobs_mod.DEGREE_LEVELS.index(crit["level"])
     levels = []
+    today = today_key()
     for entry in education:
         level = jobs_mod.degree_level(entry.get("degree", ""))
         levels.append(level)
         if level is None or level < needed:
             continue
         end = entry.get("graduation") or entry.get("end")
-        pursuing = end == "present" or jobs_mod.is_future(end)
-        if crit["status"] == "pursuing" and not pursuing:
+        pursuing = None
+        if end == "present":
+            pursuing = True
+        elif date_span(end):
+            # A year/month that spans today cannot establish either status.
+            earliest, latest = date_span(end)
+            if earliest > today:
+                pursuing = True
+            elif latest <= today:
+                pursuing = False
+        if crit["status"] == "pursuing" and pursuing is not True:
             continue
-        if crit["status"] == "completed" and (pursuing or not end):
+        if crit["status"] == "completed" and pursuing is not False:
             continue
         if not _field_matches(entry.get("field", ""), crit["fields"]):
             continue
@@ -80,7 +90,10 @@ def _graduation(crit: dict, prof: dict) -> tuple[str, str]:
     if not grad:
         return UNKNOWN, "No graduation date in profile"
     # A partial date ("2026") spans a period; only a comparison that holds for the whole period counts.
-    earliest, latest = date_key(grad), date_key(grad, end_of_period=True)
+    span = date_span(grad)
+    if not span:
+        return UNKNOWN, f"Graduation date {grad!r} is not a valid date"
+    earliest, latest = span
     if crit.get("from"):
         start = date_key(crit["from"])
         if latest < start:

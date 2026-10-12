@@ -98,7 +98,7 @@ def rows() -> list[dict]:
             "title": job["title"],
             "review": review,
             "status": job["tracking"]["status"],
-            "updated": (job["tracking"]["history"][-1]["at"] if job["tracking"].get("history") else job["created_at"])[:10],
+            "updated": (job["tracking"]["history"][-1]["at"] if job["tracking"].get("history") else job.get("created_at", "-"))[:10],
             "checklist": counts,
         })
     # Damaged jobs stay visible so the user can restore them.

@@ -13,7 +13,7 @@ from . import SCHEMA_VERSION, store, validate, input_schema
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
-VALIDATION_VERSION = 2
+VALIDATION_VERSION = 3
 
 
 def _path(job_id: str):

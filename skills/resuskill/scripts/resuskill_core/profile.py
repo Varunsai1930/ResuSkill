@@ -110,6 +110,10 @@ def _entry_key(section: str, entry: dict) -> str:
     return "|".join(norm_text(_clean_str(p)) for p in parts)
 
 
+def _certification_key(cert: dict) -> tuple[str, ...]:
+    return tuple(norm_text(_clean_str(cert.get(field))) for field in ("name", "issuer", "date"))
+
+
 def _next_id(counters: dict, prefix: str) -> str:
     counters[prefix] = counters.get(prefix, 0) + 1
     return f"{prefix}-{counters[prefix]}"
@@ -283,12 +287,29 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
         cert = {k: _clean_str(v) for k, v in cert.items()}
         if not is_valid_date(cert.get("date")):
             errors.append(f"certifications[{index}].date is not a valid date")
+        certs.append((index, cert))
+    # Reuse previous IDs for certifications given without one, most specific match
+    # first: exact (duplicates included), then a corrected date, then a corrected
+    # issuer. An ID supplied explicitly anywhere in the input is never taken implicitly.
+    taken = {cert["id"] for _, cert in certs if cert.get("id")}
+    previous_certs = [c for c in current.get("certifications") or [] if c.get("id") not in taken]
+    for size in (3, 2, 1):
+        for _, cert in certs:
+            if cert.get("id"):
+                continue
+            key = _certification_key(cert)[:size]
+            match = next((c for c in previous_certs
+                          if c["id"] not in taken and _certification_key(c)[:size] == key), None)
+            if match:
+                cert["id"] = match["id"]
+                taken.add(match["id"])
+    for index, cert in certs:
         if not cert.get("id"):
             cert["id"] = _next_id(counters, "cert")
         if not re.fullmatch(r"cert-\d+", cert["id"]) or cert["id"] in seen_ids:
             errors.append(f"certifications[{index}].id must be a unique cert-N id")
         seen_ids.add(cert["id"])
-        certs.append(cert)
+    certs = [cert for _, cert in certs]
     prof["certifications"] = certs
 
     prefs = prof.get("preferences") or {}
