@@ -41,3 +41,12 @@ Include all 25 cases; the example is intentionally incomplete. Transcript paths 
 Report unsupported-claim rate, AI-sensitive-answer rate and checklist agreement alongside denominators and per-case failures. Do not report zero rates when there were no applicable observations. A passing synthetic suite is a release signal, not a guarantee against hallucination. Add anonymized cases from real usage only with the user's permission.
 
 **Current evidence:** cross-client agent runs have not been recorded in this repository. Do not claim these evaluations passed until both clients have complete reviewed transcripts.
+
+## Job-search spot checks
+
+In addition to the scored cases, exercise job finding with fictional profiles and record the pages actually opened. These are manual behavior checks, not claims that the scored suite passed:
+
+- Mix a candidate resume, a forum thread, a search index, a closed posting, an ad with a past deadline and one current employer posting. Only the current individual posting belongs in the verified shortlist.
+- Include an employer posting and an aggregator copy with the same requisition ID, plus a second requisition with the same title. Keep one copy of the first and retain the distinct second job.
+- Offer a strong skills match that requires onsite New York while the user requests Austin or US remote. Exclude it; also check program dates and explicit graduation/availability windows before calling a student role a match.
+- Leave a deadline, remote country or graduation window unstated. Report it as Unknown rather than infer eligibility from the title or search snippet.
