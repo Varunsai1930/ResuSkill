@@ -40,6 +40,23 @@ class EvalRunnerTests(IsolatedHome):
         with self.assertRaises(ValueError):
             runner.prepare(Path(self._tmp) / "unknown", ["e99"])
 
+    def test_new_job_identity_preserves_case_input_without_leaking_expectations(self):
+        selected = ("e01", "e02", "e03", "e04", "e05", "e13", "e17", "e18", "e23")
+        output = self.prepare(selected)
+        for ident in selected:
+            case = json.loads((output / "reviewer" / f"{ident}.json").read_text())
+            prompt = (output / ident / "prompt.txt").read_text()
+            self.assertTrue(prompt.endswith("\nRequest:\n" + case["prompt"] + "\n"))
+            self.assertNotIn(case["expected"], prompt)
+            self.assertNotIn('"expected"', prompt)
+            self.assertFalse((output / ident / "workspace/home/jobs").exists())
+            if ident == "e23":
+                self.assertIn("Demo Corp, Backend Engineering Intern, Austin, TX, and inputs/job.txt", prompt)
+                self.assertNotIn('title "Example role"', prompt)
+            else:
+                self.assertIn('company "Demo Corp" and title "Example role"', prompt)
+                self.assertIn("description is the exact job text in the request below", prompt)
+
     def test_staged_cases_have_real_cli_prerequisites(self):
         output = self.prepare(("e20", "e21", "e22", "e24", "e25"))
         rejected = (output / "e20/workspace/setup.txt").read_text()

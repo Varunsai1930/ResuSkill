@@ -168,6 +168,9 @@ def prepare(output, selected=None):
             "No new generated content is approved. If further confirmation is needed, show the concrete "
             "content and ask for it; do not invent a user response.\n"
             + (f"The existing job ID is {job_id}.\n" if job_id else "No job is saved yet.\n")
+            + ('For any new job in this case, use fictional company "Demo Corp" and title "Example role". '
+               'The description is the exact job text in the request below.\n'
+               if case["id"] in {"e01", "e02", "e03", "e04", "e05", "e13", "e17", "e18"} else "")
             + ("The supplied resume is inputs/resume.txt. No profile facts have been saved.\n" if case["id"] == "e19" else "")
             + ("For the new job, use Demo Corp, Backend Engineering Intern, Austin, TX, and inputs/job.txt.\n" if case["id"] == "e23" else "")
             + "\nRequest:\n" + case["prompt"] + "\n"
