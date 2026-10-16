@@ -36,6 +36,10 @@ Ask "find me data analyst jobs" and the agent runs `profile search-terms --role 
 
 Search locations come from your saved preferences or an explicit `--location` city/region. If they are missing, the agent asks you; your contact address is never used to infer a search location. Remote-only preferences apply even with an explicit city, and uncertain graduation dates or additional degrees leave your target level Unknown until you clarify it. Use `--level` to set the level you want; `--level any` leaves searches unrestricted by level. Mid-level and management titles keep their stated level.
 
+## Showcasing GitHub projects
+
+Give the agent your GitHub and LinkedIn links when it builds your profile. Before tailoring a resume, it reads your public GitHub repositories, ranks them against the job with `job repos`, and suggests the few that best show relevant work. A project reaches your resume only after you confirm it into your profile, with your role, dates and any outcomes in your words. LinkedIn needs a login, so the agent asks you to save your LinkedIn profile as a PDF instead of reading it.
+
 ## Example
 
 ```text
@@ -109,6 +113,7 @@ For each job, under `~/.resuskill/jobs/<job-id>/out/`:
 - All data stays on your machine in `~/.resuskill/` (override with `RESUSKILL_HOME`). It's plain JSON you can read, back up or delete.
 - Your agent sends what it reads, including your profile, to its model provider (Anthropic or OpenAI) as part of normal use, under your account's terms. Leave anything confidential out of the profile.
 - Nothing is uploaded anywhere else. The skill's CLI makes no network requests.
+- When you share a GitHub link, the agent reads your public repositories from GitHub's API.
 - When you ask the agent to find jobs, it sends search terms (target roles, skills, locations, never your name or contact details) to its web search provider.
 
 ## Limits

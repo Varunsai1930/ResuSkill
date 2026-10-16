@@ -54,6 +54,12 @@ Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are
 | `availability` | `start_from` is the earliest job start; `start_by` is the latest acceptable start (dates). A profile date means available from that date: earlier availability is compatible. If only `start_from` is given, later candidate availability stays Unknown because no latest start is known. |
 | `years_experience` | `years` (number), `area` (text). Always Unknown until evidence is confirmed |
 
+## Repositories (`job repos`)
+
+A JSON list as returned by `https://api.github.com/users/<name>/repos`; extra GitHub fields are ignored. Used fields: `name` and `html_url` (required text), `description`, `language`, `pushed_at` (text or null), `topics` (list of text), `fork`, `archived`, `size`, `stargazers_count`. The agent may add `readme` (text) and `languages` (list of names, or GitHub's `{name: bytes}` object).
+
+Language names must be non-empty text; byte counts, `size` and `stargazers_count` must be non-negative integers, and `fork`/`archived` must be booleans when supplied. Combine all fetched repository pages. Ranking uses metadata and README mentions as suggestions, not proof of technologies used; verify the code and confirm project facts before importing them.
+
 ## Resume proposal (`resume propose`)
 
 ```json

@@ -23,6 +23,7 @@
 |---|---|
 | `$RS job add --company C --title T --description-file F [--location L] [--url U]` | Save a job description (`F` may be `-`) |
 | `$RS job show JOB [--description]` | Job details, requirements, questions; `--description` prints the full text |
+| `$RS job repos JOB --file F` | Offline: rank GitHub repositories (the `/users/<name>/repos` JSON the agent fetched, optional `readme`/`languages` per repo) by the job's technologies. Skips forks and empty repos, marks repos already in the profile, keeps README-only mentions separate. Stores nothing |
 | `$RS job requirements JOB --file F` | Save the reviewed requirement list (all-or-nothing; excerpts must be verbatim) |
 | `$RS checklist JOB` | Deterministic Met / Unmet / Unknown with basis and evidence |
 | `$RS evidence link JOB REQ SOURCE...` | Replace the requirement's evidence with all currently user-confirmed source IDs; changes invalidate approval |

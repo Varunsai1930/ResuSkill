@@ -13,6 +13,7 @@ from . import package as package_mod
 from . import profile as profile_mod
 from . import questions as q_mod
 from . import render as render_mod
+from . import repos as repos_mod
 from . import search as search_mod
 from . import store
 from . import track as track_mod
@@ -143,6 +144,31 @@ def cmd_job(args) -> None:
     elif args.action == "requirements":
         job = jobs_mod.set_requirements(args.job, store.load_input(args.file))
         out(job["requirements"], args.json, f"Saved {len(job['requirements'])} requirements (job r{job['revision']}).")
+    elif args.action == "repos":
+        result = repos_mod.rank(args.job, store.load_input(args.file))
+        out(result, args.json, repos_text(result))
+
+
+def repos_text(result: dict) -> str:
+    lines = ["Repository suggestions from metadata and README mentions (not saved; verify code and confirm projects before adding them):"]
+    for c in result["candidates"]:
+        where = f"already in profile as {c['in_profile']}" if c["in_profile"] else "not in profile"
+        lines.append(f"  [{c['score']}] {c['name']} ({where}) {c['url']}")
+        lines.append(f"      matches job: {', '.join(c['matches_job']) or '-'}; other: {', '.join(c['other_technologies']) or '-'}")
+        if c["readme_mentions_job"] or c["other_readme_mentions"]:
+            lines.append(f"      README mentions (check context): job {', '.join(c['readme_mentions_job']) or '-'}; "
+                         f"other {', '.join(c['other_readme_mentions']) or '-'}")
+        if c["description"]:
+            lines.append(f"      description: {c['description']}")
+        if c["notes"]:
+            lines.append(f"      notes: {'; '.join(c['notes'])}")
+    if not result["candidates"]:
+        lines.append("  (none)")
+    for e in result["excluded"]:
+        lines.append(f"  excluded {e['name']}: {e['reason']}")
+    if result["warnings"]:
+        lines.append(f"Warnings:\n{bullets(result['warnings'])}")
+    return "\n".join(lines)
 
 
 def cmd_jobs(args) -> None:
@@ -400,6 +426,9 @@ def build_parser() -> argparse.ArgumentParser:
     x = js.add_parser("requirements", parents=[common], help="save reviewed requirements (all-or-nothing)")
     x.add_argument("job")
     x.add_argument("--file", required=True)
+    x = js.add_parser("repos", parents=[common], help="rank fetched GitHub repositories against the job (offline)")
+    x.add_argument("job")
+    x.add_argument("--file", required=True, help="GitHub /users/<name>/repos JSON, optionally with readme/languages added, or -")
     p.set_defaults(func=cmd_job)
 
     p = sub.add_parser("jobs", parents=[common], help="tracker table of all jobs")
