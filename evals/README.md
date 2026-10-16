@@ -2,6 +2,23 @@
 
 The 25 cases in `cases.json` are **synthetic adversarial scenarios**, not results or real user studies. The Python tests exercise enforcement. These cases exercise the agent reading SKILL.md, deciding what to do, and reporting its work. Both are necessary.
 
+## Capture Codex evidence
+
+The standard-library runner prepares a separate skill copy and fictional data directory for each case. Expectations stay outside the agent's workspace, and review fields stay blank. Preparing cases makes no model calls:
+
+```bash
+python3 evals/run.py prepare --output /path/to/new-evaluation
+python3 evals/run.py run /path/to/new-evaluation/e01 --timeout 600
+```
+
+Repeat `run` for each prepared case. `prepare --case e01 e12` selects a smaller set for a development check. `--default-config` runs with Codex's built-in defaults when the user's CLI configuration is incompatible; it does not change that configuration. Runs use the existing signed-in account and consume its normal usage.
+
+Each case records its setup, prompt, actual execution status, client version, JSONL events, final response, transcript, and hashes of workspace files before and after execution. Model names are recorded only when emitted by the client; otherwise record the actual runtime model separately. A failed launch, timeout or completed command is never automatically graded as a pass.
+
+Some cases require staged interactions. The runner seeds fixed fictional prerequisite states and discloses their synthetic approvals; this does not prove that the agent followed those earlier approval stages. A one-turn capture is not a complete staged evaluation. Continue the captured case's session with the human's concrete approvals where needed, retaining every follow-up and resulting artifact. Never approve unseen generated content by script.
+
+After human review, copy `review-template.json` into a results file and fill its metadata, per-case notes and every observation count from the actual transcripts and artifacts. Keep unexecuted, incomplete and unreviewed cases unscored. `score.py` rejects reused or blank transcripts, missing notes, and passed cases that omit the checklist or personal-question observations required by their prompts. These checks do not authenticate a transcript or replace semantic review.
+
 ## Run in Claude Code and Codex
 
 1. Install this checkout in the client under test. Record client version, model, skill version and commit/diff. Use a new chat for each case.
@@ -36,7 +53,7 @@ The 25 cases in `cases.json` are **synthetic adversarial scenarios**, not result
 }
 ```
 
-Include all 25 cases; the example is intentionally incomplete. Transcript paths are relative to the results file. Missing/empty transcripts invalidate a run. Results should remain outside the repository unless reviewed for privacy. `passed` reflects the case's expected behavior, not just the numeric metrics.
+Include all 25 cases; the example is intentionally incomplete. Transcript paths are relative to the results file and must identify separate, nonblank case transcripts. Missing review notes invalidate a run. Results should remain outside the repository unless reviewed for privacy. `passed` reflects the case's expected behavior, not just the numeric metrics.
 
 Report unsupported-claim rate, AI-sensitive-answer rate and checklist agreement alongside denominators and per-case failures. Do not report zero rates when there were no applicable observations. A passing synthetic suite is a release signal, not a guarantee against hallucination. Add anonymized cases from real usage only with the user's permission.
 

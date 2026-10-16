@@ -15,12 +15,23 @@ class EvalScoringTests(IsolatedHome):
     def setUp(self):
         super().setUp()
         self.path = Path(self._tmp) / "calculator-test.json"
-        (self.path.parent / "test-transcript.txt").write_text("Synthetic calculator test data; no model was evaluated.")
         cases = json.loads((ROOT / "evals/cases.json").read_text())
+        decisions = {"e01": 2, "e02": 1, "e03": 1, "e04": 1, "e05": 3}
+        questions = {"e06": 3, "e07": 3, "e08": 1, "e09": 4, "e10": 1}
+        rows = []
+        for case in cases:
+            case_id = case["id"]
+            transcript = f"{case_id}-calculator-transcript.txt"
+            (self.path.parent / transcript).write_text(
+                f"Synthetic calculator test data for {case_id}; no model was evaluated.")
+            rows.append({"id": case_id, "transcript": transcript, "passed": True,
+                         "claims": int(case_id in ("e11", "e12", "e14", "e16")),
+                         "unsupported_claims": 0, "sensitive_questions": questions.get(case_id, 0),
+                         "ai_sensitive_answers": 0, "checklist_decisions": decisions.get(case_id, 0),
+                         "checklist_agreements": decisions.get(case_id, 0), "skipped_required_steps": 0,
+                         "notes": f"Synthetic review record for calculator case {case_id}; no behavioral evidence."})
         self.data = {"client": "codex", "client_version": "test", "model": "test", "revision": "test", "reviewer": "test",
-                     "cases": [{"id": c["id"], "transcript": "test-transcript.txt", "passed": True, "claims": 1,
-                                "unsupported_claims": 0, "sensitive_questions": 1, "ai_sensitive_answers": 0,
-                                "checklist_decisions": 1, "checklist_agreements": 1, "skipped_required_steps": 0} for c in cases]}
+                     "cases": rows}
 
     def score(self):
         self.path.write_text(json.dumps(self.data))
@@ -30,10 +41,12 @@ class EvalScoringTests(IsolatedHome):
         result = self.score()
         self.assertEqual(result["cases"], 25)
         self.assertEqual(result["failures"], [])
-        self.data["cases"][0]["unsupported_claims"] = 1
+        self.data["cases"][10]["unsupported_claims"] = 1
         result = self.score()
-        self.assertEqual(result["failures"], ["e01"])
-        self.assertEqual(result["unsupported_claim_rate"], 1 / 25)
+        self.assertEqual(result["failures"], ["e11"])
+        self.assertEqual(result["unsupported_claim_rate"], 1 / 4)
+        self.assertEqual(result["totals"]["sensitive_questions"], 12)
+        self.assertEqual(result["totals"]["checklist_decisions"], 8)
 
     def test_missing_cases_and_transcripts_cannot_pass(self):
         row = self.data["cases"].pop()
@@ -43,6 +56,51 @@ class EvalScoringTests(IsolatedHome):
         row["transcript"] = "missing.txt"
         with self.assertRaises(ValueError):
             self.score()
+
+    def test_reused_transcript_paths_cannot_pass(self):
+        first, second = self.data["cases"][:2]
+        for transcript in (first["transcript"], str(self.path.parent / first["transcript"]),
+                           str(Path("alias") / ".." / first["transcript"])):
+            with self.subTest(transcript=transcript):
+                second["transcript"] = transcript
+                with self.assertRaisesRegex(ValueError, "transcript path is reused"):
+                    self.score()
+
+    def test_whitespace_transcript_cannot_pass(self):
+        row = self.data["cases"][0]
+        (self.path.parent / row["transcript"]).write_text(" \n\t\r\n")
+        with self.assertRaisesRegex(ValueError, "missing or empty transcript"):
+            self.score()
+
+    def test_every_case_needs_review_notes(self):
+        row = self.data["cases"][0]
+        for notes in (None, "", " \n\t", 1):
+            with self.subTest(notes=notes):
+                row["notes"] = notes
+                with self.assertRaisesRegex(ValueError, "nonempty review notes required"):
+                    self.score()
+        del row["notes"]
+        with self.assertRaisesRegex(ValueError, "nonempty review notes required"):
+            self.score()
+
+    def test_passing_cases_cannot_omit_prompt_observations(self):
+        for row in self.data["cases"][:10]:
+            metric = "checklist_decisions" if row["id"] <= "e05" else "sensitive_questions"
+            with self.subTest(case=row["id"], metric=metric):
+                original = row[metric]
+                row[metric] -= 1
+                if metric == "checklist_decisions":
+                    row["checklist_agreements"] -= 1
+                with self.assertRaisesRegex(ValueError, "passing case must measure at least"):
+                    self.score()
+                row[metric] = original
+                if metric == "checklist_decisions":
+                    row["checklist_agreements"] = original
+
+    def test_failed_cases_with_omitted_observations_remain_scoreable(self):
+        for row in (self.data["cases"][0], self.data["cases"][5]):
+            row.update(passed=False, checklist_decisions=0, checklist_agreements=0, sensitive_questions=0)
+        self.assertEqual(self.score()["failures"], ["e01", "e06"])
 
     def test_zero_denominators_do_not_look_like_zero_failures(self):
         for row in self.data["cases"]:

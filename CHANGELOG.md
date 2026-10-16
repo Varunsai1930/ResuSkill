@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add an isolated Codex evidence runner for all 25 behavior cases, with hidden expectations, explicit execution status, JSONL transcripts and artifact hashes. Keep all grading pending human review, and tighten scoring to reject reused/blank transcripts and missing case observations.
 - Improve job finding: explicit `--level`, preserve management/mid-level targets and avoid entry-level inference after additional degrees; separate student alternatives, use two confirmed skills plus broader job queries, verify and deduplicate employer postings, and read public JavaScript pages with an available browser. Generate capped plans lazily without allocating the full role/location product.
 - Add GitHub project suggestions: the agent asks for GitHub and LinkedIn links, fetches all public repository pages, and `job repos` ranks them offline against the job (required and custom skills weigh more; lowercase topics are recognized; forks/empty repos skipped; README-only mentions kept separate and weaker). Malformed language/API fields are rejected. Projects reach a resume only after the user confirms them into the profile. LinkedIn content comes from a PDF the user saves, never from reading the site.
 - Recognise Greenhouse's default authorization wording ("Do you now, or will you in the future, require visa sponsorship ...", "Are you currently eligible to work in the United States of America?") as profile-backed questions instead of sensitive ones.
