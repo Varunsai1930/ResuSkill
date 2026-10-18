@@ -61,3 +61,35 @@ class ProfileTests(IsolatedHome):
         data["skills_absent"] = ["python"]
         with self.assertRaises(ResuError):
             profile.save(data)
+
+
+class SkillSpellingTests(IsolatedHome):
+    def test_profile_keeps_the_users_skill_spelling(self):
+        data = fixture("profile.json")
+        data["skills"] = [{"name": "REST APIs", "category": "Web"}, {"name": "Pandas", "category": "Data"},
+                          {"name": "Pytest", "category": "Tools"}]
+        data["experience"][0]["technologies"] = ["Python", "Flask", "PostgreSQL", "Pytest"]
+        saved, _, _ = profile.save(data)
+        self.assertEqual([s["name"] for s in saved["skills"]], ["REST APIs", "Pandas", "Pytest"])
+        self.assertIn("Pytest", saved["experience"][0]["technologies"])
+        # Matching still ignores spelling: "pandas" and "pytest" are the same confirmed skills.
+        self.assertTrue({"pandas", "pytest"} <= profile.skill_keys(saved))
+
+    def test_resume_shows_profile_spelling_and_puts_uncategorized_skills_last(self):
+        from resuskill_core import render
+        data = fixture("profile.json")
+        data["skills"] = [{"name": "Pytest", "category": "Tools"}, {"name": "Python", "category": "Languages"}]
+        saved, _, _ = profile.save(data)
+        html = render.resume_html(saved, {"skills": ["pytest", "SQLite", "Python"]}, "t")
+        self.assertIn("<b>Tools:</b> Pytest</p>", html)
+        self.assertLess(html.index("<b>Languages:</b>"), html.index("<b>Other:</b> SQLite"))
+        self.assertNotIn("<b>Skills:</b>", html)
+
+
+class GradeLabelTests(IsolatedHome):
+    def test_grade_keeps_its_own_label(self):
+        from resuskill_core.render import _grade
+        self.assertEqual(_grade("3.7"), "GPA 3.7")
+        self.assertEqual(_grade("CGPA: 8.88/10.0"), "CGPA: 8.88/10.0")
+        self.assertEqual(_grade("Score: 986/1000"), "Score: 986/1000")
+        self.assertEqual(_grade(""), "")

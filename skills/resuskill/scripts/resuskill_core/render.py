@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -93,7 +94,7 @@ def resume_body(prof: dict, resume: dict) -> str:
         for edu_id in resume["education"]:
             edu = education[edu_id]
             degree = ", ".join(x for x in (edu.get("degree"), edu.get("field")) if x)
-            sub = " • ".join(x for x in (degree, f"GPA {edu['gpa']}" if edu.get("gpa") else "") if x)
+            sub = " • ".join(x for x in (degree, _grade(edu.get("gpa"))) if x)
             bullets = "".join(f"<li>{_e(b['text'])}</li>" for b in edu.get("bullets") or [])
             parts.append(
                 f'<div class="entry">{_row(_e(edu["institution"]), date_range(edu))}'
@@ -128,8 +129,20 @@ def resume_body(prof: dict, resume: dict) -> str:
     if resume.get("skills"):
         categories: dict[str, list[str]] = {}
         lookup = {canon(s["name"]): s.get("category") or "Skills" for s in prof.get("skills") or []}
+        # Show each skill as the user spelled it in the profile (skills list first, then entry technologies).
+        spelling: dict[str, str] = {}
+        for s in prof.get("skills") or []:
+            spelling.setdefault(canon(s["name"]), s["name"])
+        for section in ("experience", "projects"):
+            for entry in prof.get(section) or []:
+                for tech in entry.get("technologies") or []:
+                    spelling.setdefault(canon(tech), tech)
         for name in resume["skills"]:
-            categories.setdefault(lookup.get(canon(name), "Skills"), []).append(name)
+            categories.setdefault(lookup.get(canon(name), "Skills"), []).append(spelling.get(canon(name), name))
+        # Uncategorized skills go last, labelled "Other" when named categories exist.
+        uncategorized = categories.pop("Skills", None)
+        if uncategorized:
+            categories["Other" if categories else "Skills"] = uncategorized
         rows = "".join(f"<p><b>{_e(cat)}:</b> {_e(', '.join(names))}</p>" for cat, names in categories.items())
         html.append(f'<section class="skills"><h2>Skills</h2>{rows}</section>')
 
@@ -147,6 +160,14 @@ def resume_body(prof: dict, resume: dict) -> str:
         items = "".join(lines)
         html.append(f"<section><h2>Certifications</h2><ul>{items}</ul></section>")
     return "\n".join(html)
+
+
+def _grade(value) -> str:
+    """ "3.7" -> "GPA 3.7"; a value with its own label ("CGPA: 8.88/10", "Score: 986/1000") as written."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text if re.search(r"[A-Za-z]", text) else f"GPA {text}"
 
 
 def resume_html(prof: dict, resume: dict, title: str) -> str:

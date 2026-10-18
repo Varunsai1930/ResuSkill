@@ -10,7 +10,7 @@ import copy
 import re
 
 from . import SCHEMA_VERSION, store, input_schema
-from .skills import canon, display
+from .skills import canon
 from .util import ResuError, is_valid_date, norm_text, now_iso
 
 ENTRY_SECTIONS = {"education": "edu", "experience": "exp", "projects": "proj"}
@@ -220,7 +220,7 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
                 errors.append(f"Duplicate id {entry_id}")
             seen_ids.add(entry_id)
             entry["id"] = entry_id
-            entry["technologies"] = [display(_clean_str(t)) for t in _as_list(entry.get("technologies"), f"{where}.technologies", errors) if _clean_str(t)]
+            entry["technologies"] = [_clean_str(t) for t in _as_list(entry.get("technologies"), f"{where}.technologies", errors) if _clean_str(t)]
 
             prev_bullets = {}
             for bullet in (previous or {}).get("bullets") or []:
@@ -273,7 +273,7 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             warnings.append(f"Duplicate skill {skill['name']!r} ignored")
             continue
         seen_skills.add(key)
-        skills.append({"name": display(_clean_str(skill["name"])), "category": _clean_str(skill.get("category")) or "Skills"})
+        skills.append({"name": _clean_str(skill["name"]), "category": _clean_str(skill.get("category")) or "Skills"})
     prof["skills"] = skills
 
     absent = []
@@ -285,7 +285,7 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             continue
         if canon(name) in seen_skills | entry_skills:
             errors.append(f"{name!r} is listed in both skills/entry technologies and skills_absent")
-        absent.append(display(name))
+        absent.append(name)
     prof["skills_absent"] = absent
 
     certs = []
