@@ -20,10 +20,28 @@ README_ONLY_WEIGHT = 1  # a README can name a technology without using it (examp
 
 
 def _norm_link(url) -> str:
+    """Comparable repository link: "github.com/owner/repo/tree/main#readme" -> "github.com/owner/repo"."""
     text = str(url or "").strip().lower()
     text = re.sub(r"^https?://", "", text)
     text = re.sub(r"^www\.", "", text)
-    return re.sub(r"(\.git)?/*$", "", text)
+    text = re.split(r"[?#]", text, maxsplit=1)[0]
+    parts = [p for p in text.split("/") if p]
+    if parts[:1] == ["github.com"] and len(parts) >= 3:
+        parts = parts[:3]
+    return re.sub(r"\.git$", "", "/".join(parts))
+
+
+def _one_line(value, limit: int = 300) -> str:
+    """Untrusted repository text as one plain line, so it cannot imitate CLI output lines."""
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+", " ", _text(value))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "\u2026"
+
+
+def _readme_failed(text: str) -> bool:
+    """A GitHub API error body (rate limit, not found) passed in place of README text."""
+    head = text.lstrip()[:400]
+    return head.startswith("{") and '"message"' in head and ("documentation_url" in head or "rate limit" in head.lower())
 
 
 def _job_terms(job: dict) -> dict[str, int]:
@@ -88,53 +106,75 @@ def rank(job_id: str, repos) -> dict:
     repos = _check(repos)
     weights = _job_terms(job)
     in_profile = {_norm_link(p.get("link")): p["id"] for p in prof.get("projects") or [] if p.get("link")}
-    candidates, excluded = [], []
+    # One extra-term set for the whole run: find_terms compiles and caches a pattern set per distinct set.
+    all_languages = set()
     for repo in repos:
-        name, url = repo["name"].strip(), repo["html_url"].strip()
-        if repo.get("fork") is True:
-            excluded.append({"name": name, "url": url, "reason": "fork of someone else's repository"})
-            continue
+        languages = repo.get("languages") or []
+        all_languages.update(languages)
+        if repo.get("language"):
+            all_languages.add(repo["language"])
+    extra = tuple(sorted({display(n) for n in all_languages} | {display(k) for k in weights} | {"Jupyter"}))
+    # Display names as written ("Jupyter Notebook"), not the lowercase comparison keys.
+    shown = {canon(t): t for t in extra}
+
+    def label(key: str) -> str:
+        return shown.get(key) or display(key)
+    candidates, excluded = [], []
+    failed_readmes = 0
+    for repo in repos:
+        name, url = _one_line(repo["name"], 100), repo["html_url"].strip()
         if repo.get("size") == 0:
             excluded.append({"name": name, "url": url, "reason": "empty repository"})
             continue
         languages = repo.get("languages") or []
         language_names = list(languages) if isinstance(languages, dict) else languages
-        extra = tuple(display(name) for name in language_names) + tuple(display(key) for key in weights)
-        if repo.get("language"):
-            extra += (display(repo["language"]),)
+        readme = _text(repo.get("readme"))
+        if readme and _readme_failed(readme):
+            readme = ""
+            failed_readmes += 1
         metadata = " ".join([name.replace("-", " ").replace("_", " "), _text(repo.get("description")),
                              " ".join(repo.get("topics") or []), _text(repo.get("language")), " ".join(language_names)])
         found = find_terms(metadata, extra)
         # Topics are structured, lowercase tags: prose capitalization rules do not apply.
         found |= {canon(topic) for topic in repo.get("topics") or [] if canon(topic) in weights}
-        readme_only = find_terms(_text(repo.get("readme"))[:README_LIMIT], extra) - found
+        readme_only = find_terms(readme[:README_LIMIT], extra) - found
         matched = sorted((k for k in found if k in weights), key=lambda k: (-weights[k], k))
         matched_readme = sorted((k for k in readme_only if k in weights), key=lambda k: (-weights[k], k))
         notes = []
+        if repo.get("fork") is True:
+            notes.append("fork: suggest it only if the user says it contains substantial work of their own")
         if repo.get("archived") is True:
             notes.append("archived")
-        if not _text(repo.get("readme")).strip() and not _text(repo.get("description")).strip():
+        if canon("Jupyter") in found:
+            notes.append("notebook repository: check the notebooks' kernel language before listing it")
+        if _text(repo.get("readme")) and not readme:
+            notes.append("README fetch returned a GitHub error, not README text")
+        if not readme.strip() and not _text(repo.get("description")).strip():
             notes.append("no README or description: ask the user what it does")
         candidates.append({
             "name": name,
             "url": url,
             "score": sum(weights[k] for k in matched) + README_ONLY_WEIGHT * len(matched_readme),
-            "matches_job": [display(k) for k in matched],
-            "readme_mentions_job": [display(k) for k in matched_readme],
-            "other_technologies": sorted(display(k) for k in found - set(matched)),
-            "other_readme_mentions": sorted(display(k) for k in readme_only - set(matched_readme)),
+            "matches_job": [label(k) for k in matched],
+            "readme_mentions_job": [label(k) for k in matched_readme],
+            "other_technologies": sorted(label(k) for k in found - set(matched)),
+            "other_readme_mentions": sorted(label(k) for k in readme_only - set(matched_readme)),
             "in_profile": in_profile.get(_norm_link(url)),
             "pushed_at": _text(repo.get("pushed_at")) or None,
             "stars": repo.get("stargazers_count") if isinstance(repo.get("stargazers_count"), int) else None,
-            "description": _text(repo.get("description")).strip(),
+            "description": _one_line(repo.get("description")),
             "notes": notes,
         })
-    # Highest score first; among equal scores, most recently pushed first (stable two-pass sort).
+    # Highest score first; among equal scores, most recently pushed first; forks after own repositories.
     candidates.sort(key=lambda c: c["pushed_at"] or "", reverse=True)
     candidates.sort(key=lambda c: c["score"], reverse=True)
+    candidates.sort(key=lambda c: any(n.startswith("fork:") for n in c["notes"]))
     warnings = []
     if not job["requirements"]:
         warnings.append("No requirements saved for this job; ranking uses technologies named in the description only")
-    if not any(_text(r.get("readme")).strip() for r in repos if isinstance(r, dict)):
+    if failed_readmes:
+        warnings.append(f"{failed_readmes} README(s) were GitHub error responses (often the 60-requests-per-hour "
+                        "limit) and were ignored; ranking for those repositories uses metadata only")
+    elif not any(_text(r.get("readme")).strip() for r in repos):
         warnings.append("No READMEs supplied; ranking uses names, descriptions, topics and languages only")
     return {"job": job_id, "candidates": candidates, "excluded": excluded, "warnings": warnings}
