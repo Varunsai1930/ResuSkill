@@ -88,6 +88,26 @@ Language names must be non-empty text; byte counts, `size` and `stargazers_count
 
 Only **open**, allow-listed writing prompts accept drafts. Every draft needs non-empty text and at least one source. Numbers, technologies and credentials must come from those sources (including their entry technologies); the profile summary is not included implicitly. Cite `skill:python` to mention that explicit profile skill. Duplicate `question_id` values are rejected. `bank_id` is optional and records reuse, but a bank ID alone is not evidence.
 
+## Resume presentation (`render --style F`)
+
+Use a JSON object with any of these keys; omitted keys use defaults. See `assets/navy_style.json` for a complete example. Styles change presentation only; they cannot supply resume facts, arbitrary HTML/CSS, external assets or hide sections.
+
+| Key | Allowed values |
+|---|---|
+| `font` | `sans` (default), `serif` |
+| `font_size_pt` | 9–12; default 10.5 |
+| `name_size_pt` | 16–30; default 19 |
+| `line_height` | 1.1–1.6; default 1.38 |
+| `margin_mm` | 8–25; default 15 |
+| `section_gap_pt` | 4–16; default 9 |
+| `accent`, `rule` | Six-digit hex colors such as `#193c5b` |
+| `uppercase_name`, `link_labels`, `degree_first` | Boolean; default false |
+| `projects_heading` | `Projects` or `Project Experience` |
+| `skills_heading` | `Skills` or `Technical Skills` |
+| `section_order` | A permutation of `summary`, `education`, `experience`, `projects`, `skills`, `certifications`; every key exactly once |
+
+The settings are kept in the job's `out/style.json` and reused for both accepted and proposal renders. Pass `{}` to reset. PDF provenance includes non-default styling, so a PDF from an older style cannot be paired with a newer HTML snapshot. Existing snapshots remain unchanged. Uploaded PDF templates are visual references: the agent translates their supported design choices into this JSON, rather than importing PDF code or guaranteeing pixel-identical reproduction. Inspect the exported pages; content can span multiple pages and is never silently shortened to fit.
+
 ## Stored data compatibility
 
 This release retains schema version 1. Existing v1 profiles and jobs remain readable. Unsupported schema versions are refused before writes; never relabel a newer file as v1. Back up the data directory before upgrading. Future schema changes need explicit, tested migrations that preserve originals. Approvals from older validation policies become stale and require review; legacy evidence/overrides may also require reconfirmation.

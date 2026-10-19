@@ -8,7 +8,7 @@ from . import checklist as checklist_mod
 from . import jobs as jobs_mod
 from . import package as package_mod
 from . import profile as profile_mod
-from . import render, store
+from . import render, store, style
 from .util import ResuError, now_iso, stamp
 
 
@@ -51,7 +51,8 @@ def snapshot(job_id: str) -> str:
     folder.mkdir(parents=True)
     # Freeze the PDF only if it was printed from the approved resume and current profile.
     pdf = render.out_dir(job_id) / render.pdf_name(prof)
-    pdf_current = pdf.exists() and store.read_json(render.stamp_path(pdf)) == render.pdf_stamp(prof, pkg["resume"])
+    settings = style.saved(render.out_dir(job_id))
+    pdf_current = pdf.exists() and store.read_json(render.stamp_path(pdf)) == render.pdf_stamp(prof, pkg["resume"], settings)
     store.write_json(folder / "package.json", {
         "job": {k: job[k] for k in ("id", "company", "title", "location", "url", "revision")},
         "approval": pkg["approval"],
@@ -63,6 +64,7 @@ def snapshot(job_id: str) -> str:
             "The existing PDF was printed from different content and was not frozen." if pdf.exists() else "No PDF was rendered."
         ),
         "frozen_at": now_iso(),
+        "render_style": settings,
     })
     shutil.copy2(outputs["resume"], folder / "resume.html")
     shutil.copy2(outputs["review"], folder / "review.html")

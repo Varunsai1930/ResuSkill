@@ -128,7 +128,7 @@ For each job, under `~/.resuskill/jobs/<job-id>/out/`:
 
 - Automated checks catch invented numbers, technologies and credentials; they can't judge meaning. Your review is what makes the content accurate.
 - Job search uses your agent's own web search, so it only works in clients that have one. Many job boards block automated access; the agent marks postings it could not open as unverified. It does not fill employer forms or submit applications.
-- One profile, one resume template, English-oriented keyword rules.
+- One profile, configurable resume presentation, English-oriented keyword rules. Use `render JOB --proposal --style skills/resuskill/assets/navy_style.json` for the included navy style, or create validated style JSON using the [presentation schema](skills/resuskill/references/schemas.md). The agent can translate supported design choices from a supplied resume; this is not pixel-exact PDF template import. Inspect page breaks before sharing.
 - Unknown questions default to user input. The conservative writing-prompt allow-list may send harmless questions to you too.
 - Cross-client behavioral evaluation is still required before claiming a validated public release. The [25-case evaluation pack](evals/README.md) records this separately from Python test results.
 

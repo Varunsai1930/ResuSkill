@@ -77,6 +77,7 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Add confirmed projects with `profile diff` / `profile save` (hard rule 3). Only then can the resume use them.
 
 ### 4. Tailored resume
+- If the user supplies a visual template, inspect it and translate supported typography, colors, spacing and section order into the presentation schema in `references/schemas.md`. Pass it to `render --style F`; `assets/navy_style.json` is a starting example. Keep their facts in the profile/proposal, never in styling. Explain unsupported visual features rather than promising an exact PDF clone. Inspect the printed pages for overflow and legibility before delivery.
 - Write a proposal: choose and order entries (put the projects most relevant to this job first; omit unrelated ones), rewrite bullets to emphasise what the job needs, and pick skills to show. Every bullet cites its source bullet IDs from the same entry.
 - Rewrite for relevance and clarity only: reorder, tighten, use the job's terminology **only where the source already supports it**. Keep every number, technology and credential traceable to the cited sources.
 - Run `resume propose`. Then run `render JOB --proposal` and point the user to `review.html`, which shows each original bullet beside the proposed one. Walk the user through the changes.

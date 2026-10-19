@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add validated, reusable resume styling (`render --style`), a navy preset, section ordering and degree-first education. Keep facts separate from presentation and include styling in PDF snapshot provenance.
+
 - Explain PDF launch failures, browser exit codes, timeouts and likely permission/library issues without exposing browser logs. Retain HTML fallback and existing-PDF preservation.
 
 - Add `doctor` setup diagnostics and an optional fictional PDF smoke test; explain missing profile/browser setup and keep local task outputs out of Git.

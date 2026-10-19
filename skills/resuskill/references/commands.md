@@ -59,7 +59,7 @@ Answer labels: **From profile**, **AI draft**, **User answer**, **Missing inform
 |---|---|
 | `$RS package check JOB` | Review state plus approval blockers and warnings; re-validates the accepted resume and AI answers against the current profile |
 | `$RS package approve JOB` | Approve after the user's explicit approval (never marks Applied) |
-| `$RS render JOB [--pdf] [--proposal]` | Write `out/review.html` and `out/resume.html` (or `preview.html`); `--pdf` prints with local Chrome/Edge |
+| `$RS render JOB [--pdf] [--proposal] [--style F]` | Write `out/review.html` and `out/resume.html` (or `preview.html`); `--pdf` prints with local Chrome/Edge. Validated style JSON is saved per job for later renders; `{}` resets defaults |
 | `$RS track JOB saved\|applied\|assessment\|interview\|rejected\|offer\|withdrawn [--note "..."]` | Update status; `applied` requires a current approved package and freezes a snapshot |
 | `$RS note JOB "text"` | Add a tracking note |
 

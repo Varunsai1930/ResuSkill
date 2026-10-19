@@ -21,7 +21,7 @@ from string import Template
 from . import checklist as checklist_mod
 from . import package as package_mod
 from . import profile as profile_mod
-from . import store, validate
+from . import store, validate, style as style_mod
 from .skills import canon
 from .util import ResuError, content_hash, slugify
 
@@ -51,9 +51,9 @@ def _e(value) -> str:
     return escape(str(value or ""), quote=True)
 
 
-def _link(url: str) -> str:
+def _link(url: str, label: str = "") -> str:
     href = url if url.startswith(("http://", "https://", "mailto:")) else f"https://{url}"
-    shown = url.replace("https://", "").replace("http://", "").rstrip("/")
+    shown = label or url.replace("https://", "").replace("http://", "").rstrip("/")
     return f'<a href="{_e(href)}">{_e(shown)}</a>'
 
 
@@ -70,7 +70,8 @@ def _missing_refs(prof: dict, resume: dict) -> list[str]:
     return missing
 
 
-def resume_body(prof: dict, resume: dict) -> str:
+def resume_body(prof: dict, resume: dict, style: dict | None = None) -> str:
+    settings = style_mod.normalize(style)
     missing = _missing_refs(prof, resume)
     if missing:
         raise ResuError(
@@ -82,11 +83,12 @@ def resume_body(prof: dict, resume: dict) -> str:
     if contact.get("email"):
         bits.append(f'<span><a href="mailto:{_e(contact["email"])}">{_e(contact["email"])}</a></span>')
     bits += [f"<span>{_e(contact.get(k))}</span>" for k in ("phone", "location") if contact.get(k)]
-    bits += [f"<span>{_link(url)}</span>" for url in (contact.get("links") or {}).values() if url]
-    html = [f'<header><h1>{_e(contact["name"])}</h1><div class="contact">{"".join(bits)}</div></header>']
+    bits += [f"<span>{_link(url, name if settings['link_labels'] else '')}</span>" for name, url in (contact.get("links") or {}).items() if url]
+    header = f'<header><h1>{_e(contact["name"])}</h1><div class="contact">{"".join(bits)}</div></header>'
+    sections = {}
 
     if resume.get("summary"):
-        html.append(f'<section><h2>Summary</h2><p class="summary">{_e(resume["summary"]["text"])}</p></section>')
+        sections['summary'] = f'<section><h2>Summary</h2><p class="summary">{_e(resume["summary"]["text"])}</p></section>'
 
     education = {e["id"]: e for e in prof.get("education") or []}
     if resume.get("education"):
@@ -94,13 +96,14 @@ def resume_body(prof: dict, resume: dict) -> str:
         for edu_id in resume["education"]:
             edu = education[edu_id]
             degree = ", ".join(x for x in (edu.get("degree"), edu.get("field")) if x)
-            sub = " • ".join(x for x in (degree, _grade(edu.get("gpa"))) if x)
+            main, secondary = (degree, edu["institution"]) if settings['degree_first'] else (edu["institution"], degree)
+            sub = " • ".join(x for x in (secondary, _grade(edu.get("gpa"))) if x)
             bullets = "".join(f"<li>{_e(b['text'])}</li>" for b in edu.get("bullets") or [])
             parts.append(
-                f'<div class="entry">{_row(_e(edu["institution"]), date_range(edu))}'
+                f'<div class="entry">{_row(_e(main), date_range(edu))}'
                 f'<div class="sub">{_e(sub)}</div>{f"<ul>{bullets}</ul>" if bullets else ""}</div>'
             )
-        html.append(f"<section><h2>Education</h2>{''.join(parts)}</section>")
+        sections['education'] = f"<section><h2>Education</h2>{''.join(parts)}</section>"
 
     for section, heading in (("experience", "Experience"), ("projects", "Projects")):
         items = resume.get(section) or []
@@ -124,7 +127,9 @@ def resume_body(prof: dict, resume: dict) -> str:
                 f'{f"<div class=sub>{_e(sub)}{link}</div>" if sub or link else ""}'
                 f'{f"<ul>{bullets}</ul>" if bullets else ""}</div>'
             )
-        html.append(f"<section><h2>{heading}</h2>{''.join(parts)}</section>")
+        if section == 'projects':
+            heading = settings['projects_heading']
+        sections[section] = f"<section><h2>{heading}</h2>{''.join(parts)}</section>"
 
     if resume.get("skills"):
         categories: dict[str, list[str]] = {}
@@ -144,7 +149,7 @@ def resume_body(prof: dict, resume: dict) -> str:
         if uncategorized:
             categories["Other" if categories else "Skills"] = uncategorized
         rows = "".join(f"<p><b>{_e(cat)}:</b> {_e(', '.join(names))}</p>" for cat, names in categories.items())
-        html.append(f'<section class="skills"><h2>Skills</h2>{rows}</section>')
+        sections['skills'] = f'<section class="skills"><h2>{settings["skills_heading"]}</h2>{rows}</section>'
 
     certs = {c["id"]: c for c in prof.get("certifications") or []}
     if resume.get("certifications"):
@@ -158,8 +163,8 @@ def resume_body(prof: dict, resume: dict) -> str:
                 text += f" ({_e(fmt_date(cert['date']))})"
             lines.append(f"<li>{text}</li>")
         items = "".join(lines)
-        html.append(f"<section><h2>Certifications</h2><ul>{items}</ul></section>")
-    return "\n".join(html)
+        sections['certifications'] = f"<section><h2>Certifications</h2><ul>{items}</ul></section>"
+    return "\n".join([header] + [sections[key] for key in settings['section_order'] if key in sections])
 
 
 def _grade(value) -> str:
@@ -170,9 +175,9 @@ def _grade(value) -> str:
     return text if re.search(r"[A-Za-z]", text) else f"GPA {text}"
 
 
-def resume_html(prof: dict, resume: dict, title: str) -> str:
+def resume_html(prof: dict, resume: dict, title: str, style: dict | None = None) -> str:
     template = Template(TEMPLATE_PATH.read_text(encoding="utf-8"))
-    return template.safe_substitute(title=_e(title), body=resume_body(prof, resume))
+    return template.substitute(title=_e(title), body=resume_body(prof, resume, style), style=style_mod.css(style))
 
 
 # ---------------------------------------------------------------- review page
@@ -287,9 +292,13 @@ def pdf_name(prof: dict) -> str:
     return f"{slugify(prof['contact']['name'], 40).replace('-', '_').title()}_Resume.pdf"
 
 
-def pdf_stamp(prof: dict, resume: dict) -> dict:
+def pdf_stamp(prof: dict, resume: dict, style: dict | None = None) -> dict:
     """What a resume PDF was printed from, so a snapshot can tell a current PDF from a stale one."""
-    return {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"]}
+    result = {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"]}
+    settings = style_mod.normalize(style)
+    if settings != style_mod.DEFAULT:
+        result['style_hash'] = content_hash(settings)
+    return result
 
 
 def stamp_path(pdf: Path) -> Path:
@@ -410,7 +419,7 @@ def print_pdf(html_path: Path, pdf_path: Path) -> Path:
     return pdf_path
 
 
-def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> dict:
+def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, style: dict | None = None) -> dict:
     from . import jobs as jobs_mod
 
     job = jobs_mod.load(job_id)
@@ -418,6 +427,7 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> d
     pkg = package_mod.load(job_id)
     proposal = package_mod.load_proposal(job_id)
     folder = out_dir(job_id)
+    settings = style_mod.normalize(style) if style is not None else style_mod.saved(folder)
     outputs: dict[str, str] = {}
 
     review = folder / "review.html"
@@ -436,12 +446,14 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False) -> d
         state = package_mod.review_state(job, pkg, prof)
         if state != package_mod.APPROVED:
             outputs["note"] = f"Package is {state.upper()}; this resume has not been approved in its current form."
-    target.write_text(resume_html(prof, resume, f"{prof['contact']['name']} — Resume"), encoding="utf-8")
+    target.write_text(resume_html(prof, resume, f"{prof['contact']['name']} — Resume", settings), encoding="utf-8")
+    if style is not None:
+        store.write_json(folder / 'style.json', settings)
     outputs["resume"] = str(target)
     if want_pdf:
         pdf = folder / (pdf_name(prof) if not use_proposal else "preview.pdf")
         outputs["pdf"] = str(print_pdf(target, pdf))
         stamp_path(pdf).unlink(missing_ok=True)
         if not use_proposal:
-            store.write_json(stamp_path(pdf), pdf_stamp(prof, resume))
+            store.write_json(stamp_path(pdf), pdf_stamp(prof, resume, settings))
     return outputs

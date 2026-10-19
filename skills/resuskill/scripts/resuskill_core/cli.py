@@ -346,7 +346,8 @@ def cmd_package(args) -> None:
 
 
 def cmd_render(args) -> None:
-    outputs = render_mod.render(args.job, want_pdf=args.pdf, use_proposal=args.proposal)
+    outputs = render_mod.render(args.job, want_pdf=args.pdf, use_proposal=args.proposal,
+                                style=store.load_input(args.style) if args.style else None)
     out(outputs, args.json, "\n".join(f"{k}: {v}" for k, v in outputs.items()))
 
 
@@ -540,6 +541,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("job")
     p.add_argument("--pdf", action="store_true")
     p.add_argument("--proposal", action="store_true", help="preview the pending proposal instead")
+    p.add_argument("--style", help="validated presentation JSON; saved for later renders of this job ({} resets)")
     p.set_defaults(func=cmd_render)
 
     p = sub.add_parser("track", help="set tracking status (applied freezes a snapshot)")
