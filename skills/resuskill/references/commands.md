@@ -26,6 +26,7 @@
 | `$RS job show JOB [--description]` | Job details, requirements, questions; `--description` prints the full text |
 | `$RS job repos JOB --file F` | Offline: rank GitHub repositories (the `/users/<name>/repos` JSON the agent fetched, optional `readme`/`languages` per repo) by the job's technologies. Skips empty repos, lists forks last with a note, marks repos already in the profile (links inside a repo still match), keeps README-only mentions separate, flags notebook repos, ignores README text that is a GitHub error response, and prints repository text as single lines. Stores nothing |
 | `$RS job requirements JOB --file F` | Save the reviewed requirement list (all-or-nothing; excerpts must be verbatim) |
+| `$RS job observe JOB --file F` | Replace reviewed listing status, verification timestamp/source, deadline, program dates and conditional eligibility. Offline; shows age/expiry warnings and invalidates older approval |
 | `$RS checklist JOB` | Deterministic Met / Unmet / Unknown with basis and evidence |
 | `$RS evidence link JOB REQ SOURCE...` | Replace the requirement's evidence with all currently user-confirmed source IDs; changes invalidate approval |
 | `$RS evidence unlink JOB REQ` | Remove evidence links |

@@ -17,6 +17,7 @@ from . import repos as repos_mod
 from . import search as search_mod
 from . import store
 from . import track as track_mod
+from . import listing as listing_mod
 from .util import ResuError
 
 
@@ -115,6 +116,9 @@ def job_text(job: dict) -> str:
     lines = [f"{job['id']}: {job['title']} at {job['company']} (r{job['revision']})",
              f"Location: {job.get('location') or '-'} | URL: {job.get('url') or '-'}",
              f"Status: {job['tracking']['status']} | Description: {len(job['description'])} characters"]
+    listing = listing_mod.assess(job)
+    lines.append(f"Listing: {listing['state']} | checked: {listing['verified_at'] or 'unknown'} | deadline: {listing['deadline'] or 'unknown'} | eligibility: {listing['eligibility']}")
+    lines.extend('  ' + warning for warning in listing['warnings'])
     if job["requirements"]:
         lines.append("Requirements:")
         for r in job["requirements"]:
@@ -141,6 +145,9 @@ def cmd_job(args) -> None:
             out(job["description"], args.json, job["description"])
             return
         out(job, args.json, job_text(job))
+    elif args.action == "observe":
+        job = jobs_mod.observe(args.job, store.load_input(args.file))
+        out(listing_mod.assess(job), args.json, job_text(job))
     elif args.action == "requirements":
         job = jobs_mod.set_requirements(args.job, store.load_input(args.file))
         out(job["requirements"], args.json, f"Saved {len(job['requirements'])} requirements (job r{job['revision']}).")
@@ -176,11 +183,16 @@ def cmd_jobs(args) -> None:
     if args.json or not table:
         out(table, args.json, "No jobs saved yet.")
         return
-    print(f"{'JOB':34} {'COMPANY':18} {'TITLE':26} {'REVIEW':9} {'STATUS':11} {'CHECKLIST':16} UPDATED")
+    print(f"{'JOB':34} {'COMPANY':18} {'TITLE':26} {'REVIEW':9} {'STATUS':11} {'LISTING':14} {'CHECKLIST':16} UPDATED")
     for r in table:
         counts = r["checklist"]
         check = f"{counts['met']}M {counts['unmet']}U {counts['unknown']}?" if counts else "-"
-        print(f"{r['id'][:34]:34} {r['company'][:18]:18} {r['title'][:26]:26} {r['review']:9} {r['status']:11} {check:16} {r['updated']}")
+        print(f"{r['id'][:34]:34} {r['company'][:18]:18} {r['title'][:26]:26} {r['review']:9} {r['status']:11} {r.get('listing', {}).get('state', '-'):14} {check:16} {r['updated']}")
+        if r.get('listing'):
+            info = r['listing']
+            print(f"  deadline: {info['deadline'] or 'unknown'} | eligibility: {info['eligibility']}")
+            for warning in info['warnings']:
+                print('  ' + warning)
     for r in table:
         if r.get("error"):
             print(f"warning: {r['id']}: {r['error']}", file=sys.stderr)
@@ -436,6 +448,9 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("job")
     x.add_argument("--description", action="store_true", help="print the full description text")
     x = js.add_parser("requirements", parents=[common], help="save reviewed requirements (all-or-nothing)")
+    x.add_argument("job")
+    x.add_argument("--file", required=True)
+    x = js.add_parser("observe", parents=[common], help="record reviewed listing status, dates and eligibility (offline)")
     x.add_argument("job")
     x.add_argument("--file", required=True)
     x = js.add_parser("repos", parents=[common], help="rank fetched GitHub repositories against the job (offline)")

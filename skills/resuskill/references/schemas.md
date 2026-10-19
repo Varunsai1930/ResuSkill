@@ -54,6 +54,32 @@ Bullets may be plain strings on input. `authorized` / `requires_sponsorship` are
 | `availability` | `start_from` is the earliest job start; `start_by` is the latest acceptable start (dates). A profile date means available from that date: earlier availability is compatible. If only `start_from` is given, later candidate availability stays Unknown because no latest start is known. |
 | `years_experience` | `years` (number), `area` (text). Always Unknown until evidence is confirmed |
 
+## Listing observations (`job observe`)
+
+Record what you actually read, separately from the application's Saved/Applied state. This command makes no network requests and cannot authenticate an agent's observation. Pass the complete object to replace an earlier observation; omitted fields become unknown/default, not inherited.
+
+```json
+{
+  "status": "open",
+  "verified_at": "2026-10-19T12:00:00+05:30",
+  "source_url": "https://example.com/careers/123",
+  "status_excerpt": "Apply now",
+  "deadline": "2026-10-24",
+  "program_start": null,
+  "program_end": null,
+  "intake_note": "Summer intake year is not stated",
+  "eligibility": "conditional",
+  "eligibility_note": "Requires relocation; willingness is unconfirmed"
+}
+```
+
+- `status`: `unknown`, `open`, `closed`. Open/closed needs a timezone-aware `verified_at`, a public HTTP(S) `source_url` and a verbatim `status_excerpt` from the observed page. This excerpt may describe a newly closed page rather than the older saved job description.
+- `deadline`: null, full `YYYY-MM-DD`, or a timezone-aware ISO timestamp when an exact cutoff is known. Date-only cutoffs include the whole local calendar day; their timezone is unspecified. Do not invent a timezone.
+- `program_start`/`program_end`: null or full dates, in order. Ambiguous or yearless summer programs stay null with an `intake_note`.
+- `eligibility`: `unknown`, `preference_match`, `conditional`, `mismatch`. This records a reviewed assessment, not guaranteed eligibility. Conditional/mismatch requires a note. A skills match cannot override location, graduation or availability conditions.
+- Missing metadata on older jobs stays unverified. The tracker/review/check commands distinguish `observed_open`, `closed`, `expired`, `stale` (open observation older than seven days), and `unverified`. Future timestamps are flagged. Eligibility conditions and past program dates remain visible.
+- Changes increment the job revision and make old approvals stale. Listing warnings do not prevent historical tracking or approval of content; they never imply permission to apply.
+
 ## Repositories (`job repos`)
 
 A JSON list as returned by `https://api.github.com/users/<name>/repos`; extra GitHub fields are ignored. Used fields: `name` and `html_url` (required text), `description`, `language`, `pushed_at` (text or null), `topics` (list of text), `fork`, `archived`, `size`, `stargazers_count`. The agent may add `readme` (text) and `languages` (list of names, or GitHub's `{name: bytes}` object).

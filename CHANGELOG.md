@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record job observations, deadlines, intake dates and conditional eligibility with `job observe`. Show stale/closed/expired/unverified states separately from application tracking, while keeping legacy jobs readable and historical tracking available.
+
 - Add validated, reusable resume styling (`render --style`), a navy preset, section ordering and degree-first education. Keep facts separate from presentation and include styling in PDF snapshot provenance.
 
 - Explain PDF launch failures, browser exit codes, timeouts and likely permission/library issues without exposing browser logs. Retain HTML fallback and existing-PDF preservation.

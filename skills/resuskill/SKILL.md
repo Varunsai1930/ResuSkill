@@ -58,6 +58,7 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Ask which jobs to save. For each one the user picks, save the full description you actually read (or that the user pastes) with `job add ... --url URL`, then continue with step 2. Never save a description assembled from search snippets.
 
 ### 2. Job and requirements
+- After reading a live posting, use `job observe` with the listing-observation schema to record its source, verified timestamp, visible status, deadline/program dates and eligibility conditions. Never use the save time as verification. Check the tracker warnings before recommending it again. Recheck stale observations; leave ambiguous intake dates unknown. Keep conditional relocation/timing alternatives separate from preference-matching openings and never count them as confirmed matches.
 - Save the pasted description verbatim with `job add` (`--description-file -`). A URL is only a saved reference; do not claim to have read a page you could not open.
 - Extract requirements. Every `excerpt` must be copied verbatim from the description. Add a `criterion` only when the requirement is explicitly comparable (skill, degree, graduation window, location/work mode, authorization, start date, years of experience); otherwise use `null`.
 - Show the extracted list to the user, apply their corrections, then save with `job requirements`. A rejection means an excerpt was not verbatim; fix it.

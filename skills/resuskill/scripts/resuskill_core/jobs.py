@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 
 from . import SCHEMA_VERSION, store, input_schema
+from . import listing
 from .util import ResuError, date_key, is_valid_date, norm_text, now_iso, slugify
 
 CATEGORIES = {"skill", "education", "experience", "location", "authorization", "availability", "other"}
@@ -48,6 +49,8 @@ def _check_stored(job, folder: str) -> None:
     if job["id"] != folder:
         raise ResuError(f"Stored job id {job['id']!r} does not match its folder {folder!r}; "
                         "a copied folder must keep its original name or be removed")
+    if 'listing' in job:
+        listing.normalize(job['listing'])
     try:
         input_schema.check(job["requirements"], input_schema.REQUIREMENTS, "stored requirements")
     except ResuError as exc:
@@ -127,6 +130,16 @@ def add(company: str, title: str, description: str, location: str = "", url: str
 
 
 # ---------------------------------------------------------------- requirements
+
+def observe(job_id: str, data) -> dict:
+    """Replace the complete reviewed observation, invalidating older approval."""
+    clean = listing.normalize(data)
+    job = load(job_id)
+    if job.get('listing') != clean:
+        job['listing'] = clean
+        job['revision'] += 1
+        save(job)
+    return job
 
 def _str_list(crit: dict, field: str, where: str, errors: list[str]) -> list[str]:
     """A list of non-empty strings; a bare string is an error, not a list of characters."""

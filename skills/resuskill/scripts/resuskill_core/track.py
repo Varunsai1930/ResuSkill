@@ -8,7 +8,7 @@ from . import checklist as checklist_mod
 from . import jobs as jobs_mod
 from . import package as package_mod
 from . import profile as profile_mod
-from . import render, store, style
+from . import render, store, style, listing
 from .util import ResuError, now_iso, stamp
 
 
@@ -65,6 +65,7 @@ def snapshot(job_id: str) -> str:
         ),
         "frozen_at": now_iso(),
         "render_style": settings,
+        "listing": listing.assess(job),
     })
     shutil.copy2(outputs["resume"], folder / "resume.html")
     shutil.copy2(outputs["review"], folder / "review.html")
@@ -102,6 +103,7 @@ def rows() -> list[dict]:
             "status": job["tracking"]["status"],
             "updated": (job["tracking"]["history"][-1]["at"] if job["tracking"].get("history") else job.get("created_at", "-"))[:10],
             "checklist": counts,
+            "listing": listing.assess(job),
         })
     # Damaged jobs stay visible so the user can restore them.
     for job_id, error in problems:

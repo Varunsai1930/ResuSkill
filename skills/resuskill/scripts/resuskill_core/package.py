@@ -10,6 +10,7 @@ from . import jobs as jobs_mod
 from . import profile as profile_mod
 from . import questions as q_mod
 from . import SCHEMA_VERSION, store, validate, input_schema
+from . import listing
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
@@ -410,7 +411,7 @@ def check(job_id: str) -> tuple[list[str], list[str]]:
     prof = profile_mod.load()
     pkg = load(job_id)
     blockers: list[str] = []
-    warnings: list[str] = []
+    warnings: list[str] = listing.assess(job)['warnings']
     if not pkg.get("resume"):
         blockers.append("No accepted resume. Propose one and run `resume accept`.")
     else:

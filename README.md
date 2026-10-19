@@ -36,6 +36,8 @@ Ask "find me data analyst jobs" and the agent runs `profile search-terms --role 
 
 Search locations come from your saved preferences or an explicit `--location` city/region. If they are missing, the agent asks you; your contact address is never used to infer a search location. Remote-only preferences apply even with an explicit city, and uncertain graduation dates or additional degrees leave your target level Unknown until you clarify it. Use `--level` to set the level you want; `--level any` leaves searches unrestricted by level. Mid-level and management titles keep their stated level.
 
+The agent records live checks with `job observe`: source, timestamp, visible open/closed status, deadline, program dates and eligibility conditions. `jobs`, the HTML review and `package check` show expired, stale or unverified listings and conditional alternatives. A saved job is not automatically an open vacancy; observations older than seven days need rechecking. The CLI remains offline and cannot guarantee that a posting is still open.
+
 ## Showcasing GitHub projects
 
 Give the agent your GitHub and LinkedIn links when it builds your profile. Before tailoring a resume, it reads your public GitHub repositories, ranks them against the job with `job repos`, and suggests the few that best show relevant work. A project reaches your resume only after you confirm it into your profile, with your role, dates and any outcomes in your words. LinkedIn needs a login, so the agent asks you to save your LinkedIn profile as a PDF instead of reading it.

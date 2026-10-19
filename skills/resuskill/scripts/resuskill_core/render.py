@@ -21,7 +21,7 @@ from string import Template
 from . import checklist as checklist_mod
 from . import package as package_mod
 from . import profile as profile_mod
-from . import store, validate, style as style_mod
+from . import store, validate, listing, style as style_mod
 from .skills import canon
 from .util import ResuError, content_hash, slugify
 
@@ -262,11 +262,18 @@ def review_html(job: dict, prof: dict, pkg: dict, proposal: dict | None) -> str:
             f"{_e(a['text'])}{evidence}{draft}</td></tr>")
     answer_rows = "".join(answer_rows) or "<tr><td colspan=3 class='meta'>No questions added.</td></tr>"
     pending = proposal["proposal"] if proposal else None
+    observation = listing.assess(job)
+    listing_notes = ''.join(f'<li>{_e(w)}</li>' for w in observation['warnings'])
     body = f"""
 <main>
 <h1>{_e(job['title'])} — {_e(job['company'])}</h1>
 <p class="meta">Job {_e(job['id'])} · review state <b>{_e(state.upper())}</b> · tracking <b>{_e(job['tracking']['status'])}</b> ·
 profile r{prof['_meta']['revision']} · job r{job['revision']}</p>
+<h2>Listing observation</h2>
+<p>Listing: <b>{_e(observation['state'])}</b> · checked: {_e(observation['verified_at'] or 'unknown')} · deadline: {_e(observation['deadline'] or 'unknown')} · eligibility: {_e(observation['eligibility'])}</p>
+<p>{_link(observation['source_url']) if observation['source_url'] else 'No verified source recorded.'}</p>
+<ul>{listing_notes}</ul>
+<p class="meta">An observation records what was read; it is not a live availability or eligibility guarantee.</p>
 <h2>Requirement checklist</h2>
 <p><span class="pill met">{counts['met']} met</span> <span class="pill unmet">{counts['unmet']} unmet</span>
 <span class="pill unknown">{counts['unknown']} unknown</span></p>
