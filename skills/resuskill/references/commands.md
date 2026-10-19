@@ -60,6 +60,7 @@ Answer labels: **From profile**, **AI draft**, **User answer**, **Missing inform
 |---|---|
 | `$RS package check JOB` | Review state plus approval blockers and warnings; re-validates the accepted resume and AI answers against the current profile |
 | `$RS package approve JOB` | Approve after the user's explicit approval (never marks Applied) |
+| `$RS ats JOB [--proposal] [--pdf FILE] [--json]` | Read-only ATS preflight: current-source validation, structured skill coverage and optional local PDF text comparison |
 | `$RS render JOB [--pdf] [--proposal] [--style F]` | Write `out/review.html` and `out/resume.html` (or `preview.html`); `--pdf` prints with local Chrome/Edge. Validated style JSON is saved per job for later renders; `{}` resets defaults |
 | `$RS track JOB saved\|applied\|assessment\|interview\|rejected\|offer\|withdrawn [--note "..."]` | Update status; `applied` requires a current approved package and freezes a snapshot |
 | `$RS note JOB "text"` | Add a tracking note |
@@ -81,3 +82,19 @@ python3 "$SKILL/scripts/resuskill.py" batch-export JOB1 JOB2 --output /path/to/n
 Default: pending proposals. Use `--accepted` to select accepted resumes instead. All selected resumes are revalidated against current facts before a new output directory is created. Missing/invalid selections fail the whole preflight. Duplicate IDs and existing output directories are refused. `--style F` changes this pack only; otherwise each job's saved style is used.
 
 The pack contains `index.html`, `report.json`, per-job resume/review HTML, successful PDFs, and `resumes.zip`. PDF failures return exit 1 and remain in the report; HTML is still available. Retry into a new directory. Other filesystem failures can leave an incomplete directory; do not deliver it as complete. No drafts are accepted, packages approved, applications submitted or tracking statuses changed. The pack contains personal resume content and evidence reviews; share only the intended resume files with employers.
+
+## ATS preflight
+
+```bash
+python3 "<skill-dir>/scripts/resuskill.py" ats JOB --proposal --pdf /path/to/resume.pdf --json
+```
+
+Checks the accepted resume by default; `--proposal` explicitly selects the pending draft. Revalidates current facts before reporting. It reads stored data and the supplied PDF without changing drafts, approvals, tracking, or profile facts. Redirect JSON to a report file if needed; it includes resume content and source IDs, so treat it as personal data.
+
+Skill coverage uses structured `skill` criteria from the reviewed requirements. Required, preferred and unspecified groups have separate counts; `any` groups need one alternative, `all` groups need each term. Matching uses ResuSkill's aliases and term boundaries. Presence in selected visible content counts; hidden hrefs, citations and unselected projects do not. Counts are keyword coverage, not eligibility or an ATS score. No groups means no assessed coverage, not a perfect match. Other technologies mentioned in the description are context only: they may be examples, negations or company boilerplate. Keep degree, experience, location and soft-skill judgments in the checklist.
+
+A missing term is `supported_omitted`, `not_confirmed`, or `confirmed_absent`. Only the first suggests considering the existing skill, with profile source IDs. Confirm relevance and cite the actual project facts before rewriting bullets; never add unconfirmed skills to chase keywords. The checker does not rewrite or accept resumes automatically.
+
+`--pdf FILE` checks the actual export, using local Poppler `pdftotext` or optional Python `pypdf`. Without either parser, PDF checks remain `not_checked` with setup guidance; HTML/content checks still run. Files must have a PDF header and be at most 20 MiB; the pypdf fallback rejects encrypted files and files over 30 pages. It compares contact fields, headings, summary, entry labels, dates, bullets, education labels, certificate names and skills with the selected current content, tolerating whitespace/typography differences. Missing text, clipping or stale/different exports produce errors. It does not authenticate file provenance, verify exact visual layout, compare every profile field, or emulate a particular employer's parser. Inspect page images and the employer's autofilled fields yourself.
+
+Exit 1 on rejected input/current-claim validation or PDF text errors. Warnings, uncovered keyword groups and unavailable optional parsers return 0 and remain visible in the report. No ATS service is contacted and no hiring outcome is predicted. The parsing guidance follows [Greenhouse's documented failure examples](https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse); different systems may behave differently.

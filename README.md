@@ -155,3 +155,7 @@ For release qualification, run the CI OS/Python matrix, copied-install smoke tes
 ### Multi-job resume packs
 
 After preparing a proposal for each selected job, run `batch-export JOB1 JOB2 --output /path/to/new-pack --pdf`. The pack includes a review index, per-job HTML/PDF files, a failure report and a ZIP. It does not approve drafts or apply for jobs. Use `--accepted` for already accepted resumes and `--style F` for a pack-specific presentation. Share only the intended resumes: the review pages contain source evidence and application context. See the [command reference](skills/resuskill/references/commands.md).
+
+### ATS preflight
+
+Use `ats JOB --proposal --pdf /path/to/resume.pdf` before sharing a tailored draft. It checks current source validity, required/preferred skill groups, missing contact/education details, and text retained in the actual PDF. Supported omissions come with sources; unconfirmed skills stay out. PDF checks need local Poppler or optional `pypdf`, and are explicitly marked unrun when unavailable. This is an offline review aid with concrete findings, not a simulated employer score or a guarantee of parsing or selection. See the [command reference](skills/resuskill/references/commands.md#ats-preflight).

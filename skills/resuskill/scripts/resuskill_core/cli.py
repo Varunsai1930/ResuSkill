@@ -576,7 +576,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--accepted", action="store_true", help="export accepted resumes; default is pending proposals")
     p.add_argument("--style", help="presentation JSON for this export only")
     p.set_defaults(func=cmd_batch)
+    p = sub.add_parser("ats", parents=[common], help="local ATS preflight: keyword gaps, content and optional PDF text checks")
+    p.add_argument("job")
+    p.add_argument("--proposal", action="store_true", help="check the pending draft instead of the accepted resume")
+    p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
+    p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_ats(args):
+    from . import ats
+    result = ats.check(args.job, args.proposal, args.pdf)
+    out(result, args.json, ats.text_report(result))
+    return 1 if any(i['severity'] == 'error' for i in result['issues']) else 0
 
 
 def cmd_batch(args):
