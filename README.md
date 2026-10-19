@@ -151,3 +151,7 @@ For release qualification, run the CI OS/Python matrix, copied-install smoke tes
 ## License
 
 [MIT](LICENSE)
+
+### Multi-job resume packs
+
+After preparing a proposal for each selected job, run `batch-export JOB1 JOB2 --output /path/to/new-pack --pdf`. The pack includes a review index, per-job HTML/PDF files, a failure report and a ZIP. It does not approve drafts or apply for jobs. Use `--accepted` for already accepted resumes and `--style F` for a pack-specific presentation. Share only the intended resumes: the review pages contain source evidence and application context. See the [command reference](skills/resuskill/references/commands.md).

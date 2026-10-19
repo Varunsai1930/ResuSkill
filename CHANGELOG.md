@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `batch-export` for selected pending proposals or accepted resumes: validate all drafts first, produce an index/report/ZIP, preserve approval state, and report PDF failures with HTML fallback.
+
 - Record job observations, deadlines, intake dates and conditional eligibility with `job observe`. Show stale/closed/expired/unverified states separately from application tracking, while keeping legacy jobs readable and historical tracking available.
 
 - Add validated, reusable resume styling (`render --style`), a navy preset, section ordering and degree-first education. Keep facts separate from presentation and include styling in PDF snapshot provenance.

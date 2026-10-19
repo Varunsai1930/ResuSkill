@@ -569,7 +569,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("job")
     p.add_argument("text")
     p.set_defaults(func=cmd_note)
+    p = sub.add_parser("batch-export", parents=[common], help="export selected resumes into a new review pack")
+    p.add_argument("jobs", nargs="+")
+    p.add_argument("--output", required=True)
+    p.add_argument("--pdf", action="store_true")
+    p.add_argument("--accepted", action="store_true", help="export accepted resumes; default is pending proposals")
+    p.add_argument("--style", help="presentation JSON for this export only")
+    p.set_defaults(func=cmd_batch)
     return parser
+
+
+def cmd_batch(args):
+    from . import batch
+    result = batch.export(args.jobs, args.output, args.pdf, args.accepted,
+                          store.load_input(args.style) if args.style else None)
+    out(result, args.json, f"Exported {len(result['jobs'])} resumes to {result['output']}\n"
+        + ("PDF errors: " + "; ".join(result['errors']) if result['errors'] else "Review index.html before use."))
+    return 1 if result['errors'] else 0
 
 
 def main(argv=None) -> int:

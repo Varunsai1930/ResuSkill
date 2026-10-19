@@ -71,3 +71,13 @@ Review state: **draft** (not approved), **approved**, **stale** (profile, job, e
 - `RESUSKILL_BROWSER`: path to a Chromium-based browser for `--pdf`.
 
 PDF failures report launch errors, exit status or timeout and a bounded diagnosis without printing raw browser logs. Previous PDFs and provenance remain intact. The generated HTML is retained for manual Print → Save as PDF. If the host restricts browser launching, follow that host's permissions flow; do not disable browser sandbox protections.
+
+## Export several tailored resumes
+
+```bash
+python3 "$SKILL/scripts/resuskill.py" batch-export JOB1 JOB2 --output /path/to/new-pack --pdf --json
+```
+
+Default: pending proposals. Use `--accepted` to select accepted resumes instead. All selected resumes are revalidated against current facts before a new output directory is created. Missing/invalid selections fail the whole preflight. Duplicate IDs and existing output directories are refused. `--style F` changes this pack only; otherwise each job's saved style is used.
+
+The pack contains `index.html`, `report.json`, per-job resume/review HTML, successful PDFs, and `resumes.zip`. PDF failures return exit 1 and remain in the report; HTML is still available. Retry into a new directory. Other filesystem failures can leave an incomplete directory; do not deliver it as complete. No drafts are accepted, packages approved, applications submitted or tracking statuses changed. The pack contains personal resume content and evidence reviews; share only the intended resume files with employers.
