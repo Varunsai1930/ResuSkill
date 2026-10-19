@@ -6,6 +6,7 @@
 | Command | Purpose |
 |---|---|
 | `$RS status` | Data directory, profile revision, job count, PDF browser |
+| `$RS doctor [--pdf-smoke] [--json]` | Check setup without changing candidate data; optional browser smoke test uses temporary fictional content. Errors exit 1; missing optional browser/profile are warnings |
 | `$RS demo [--output NEW_DIR] [--json]` | Create a fictional draft and review HTML in an isolated new directory; never use the real profile |
 | `$RS jobs` | Tracker table: review state, status, checklist counts |
 

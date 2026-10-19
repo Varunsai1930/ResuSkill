@@ -9,6 +9,8 @@ Help the user prepare honest, tailored job applications. You write drafts; the b
 
 ## Running the CLI
 
+For first-time setup or environment failures, run `doctor`; use `doctor --pdf-smoke` when PDF export needs verification. It uses fictional content and does not change candidate data. Resolve errors before importing a profile; a missing optional browser still permits HTML export.
+
 Run `python3 "<skill-dir>/scripts/resuskill.py" <command>`, where `<skill-dir>` is the directory containing this file. Quote the path because installed directories may contain spaces. It needs only Python 3.9+. Data lives in `~/.resuskill/` (or `$RESUSKILL_HOME`).
 
 Pass JSON to the CLI on stdin with `--file -` and a quoted heredoc so no stray files are left behind:

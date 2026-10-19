@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `doctor` setup diagnostics and an optional fictional PDF smoke test; explain missing profile/browser setup and keep local task outputs out of Git.
+
 - Keep the user's own skill and technology spelling ("REST APIs", "Pandas") in the profile and on the resume; matching still ignores spelling. Group uncategorized resume skills last as "Other". Print labelled grades ("CGPA: 8.88/10", "Score: 986/1000") as written. Keep each contact item on one line.
 - Repository ranking: keep forks (listed last, with a note) instead of hiding them; recognise "Jupyter Notebook" repositories; ignore GitHub error bodies passed as READMEs; match profile links that point inside a repository; print untrusted repository text as single lines; show technology names as written; compile one term set per run.
 - Add an isolated Codex evidence runner for all 25 behavior cases, with hidden expectations, explicit execution status, JSONL transcripts and artifact hashes. Keep all grading pending human review, and tighten scoring to reject reused/blank transcripts and missing case observations.

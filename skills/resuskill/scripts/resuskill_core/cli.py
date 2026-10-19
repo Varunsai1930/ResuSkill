@@ -383,6 +383,13 @@ def cmd_demo(args) -> None:
 
 # ---------------------------------------------------------------- parser
 
+def cmd_doctor(args) -> int:
+    from .doctor import check
+
+    result = check(args.pdf_smoke)
+    out(result, args.json, "\n".join(f"{c['status'].upper()}: {c['name']}: {c['detail']}" for c in result["checks"]))
+    return 0 if result["ready"] else 1
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="resuskill", description="ResuSkill: evidence-backed job application packages.")
     parser.add_argument("--version", action="version", version=f"resuskill {__version__}")
@@ -392,6 +399,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("status", parents=[common], help="data directory, profile revision, job count")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("doctor", parents=[common], help="check local setup without changing candidate data")
+    p.add_argument("--pdf-smoke", action="store_true", help="also launch the local browser with fictional content")
+    p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("demo", parents=[common], help="create a fictional draft in a separate directory")
     p.add_argument("--output", help="new directory (defaults to a fresh temporary directory)")

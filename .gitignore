@@ -8,3 +8,5 @@ __pycache__/
 .resuskill/
 resuskill-data/
 *.pdf
+/tmp/
+/output/

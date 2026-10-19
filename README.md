@@ -78,6 +78,14 @@ For a custom or older Codex install location, set `RESUSKILL_CODEX_SKILLS_DIR` t
 
 ## Try fictional data first
 
+Check your installation before importing personal data:
+
+```bash
+python3 skills/resuskill/scripts/resuskill.py doctor
+```
+
+Warnings explain optional or unfinished setup; errors return a nonzero exit code. The check does not modify your data. Use `doctor --pdf-smoke` to test the browser with a temporary fictional document. A detected browser is not proof that your agent's execution environment permits launching it. No browser is needed for HTML drafts.
+
 ```bash
 python3 skills/resuskill/scripts/resuskill.py demo --json
 ```
