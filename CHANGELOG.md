@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Explain PDF launch failures, browser exit codes, timeouts and likely permission/library issues without exposing browser logs. Retain HTML fallback and existing-PDF preservation.
+
 - Add `doctor` setup diagnostics and an optional fictional PDF smoke test; explain missing profile/browser setup and keep local task outputs out of Git.
 
 - Keep the user's own skill and technology spelling ("REST APIs", "Pandas") in the profile and on the resume; matching still ignores spelling. Group uncategorized resume skills last as "Other". Print labelled grades ("CGPA: 8.88/10", "Score: 986/1000") as written. Keep each contact item on one line.

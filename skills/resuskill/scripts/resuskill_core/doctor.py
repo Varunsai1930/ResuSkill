@@ -47,6 +47,9 @@ def check(pdf_smoke: bool = False) -> dict:
                 render.print_pdf(source, Path(temp) / "smoke.pdf")
             add("pdf_smoke", "ok", "Local browser produced a complete PDF using fictional content.")
         except (ResuError, OSError) as exc:
-            add("pdf_smoke", "error", str(exc))
+            # The smoke HTML is intentionally temporary; never offer its deleted
+            # path as a fallback. Real render failures retain their HTML.
+            detail = str(exc).split("HTML")[0].strip()
+            add("pdf_smoke", "error", detail + " Temporary smoke-test files were removed. Use a real `render JOB --proposal` HTML file for manual printing.")
     add("web_search", "info", "Job discovery needs the agent's browsing tools. This offline CLI cannot check their availability or verify live listings.")
     return {"version": __version__, "ready": not any(c["status"] == "error" for c in checks), "checks": checks}

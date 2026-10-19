@@ -359,29 +359,53 @@ def print_pdf(html_path: Path, pdf_path: Path) -> Path:
             "--no-pdf-header-footer", f"--user-data-dir={Path(temp_dir) / 'profile'}",
             f"--print-to-pdf={output}", html_path.resolve().as_uri(),
         ]
-        # Output is discarded rather than captured: browser helper processes can keep
-        # inherited pipes open long after the PDF is written.
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            deadline, last_size = time.monotonic() + 90, -1
-            while time.monotonic() < deadline:
-                if proc.poll() is not None:
-                    break
-                size = output.stat().st_size if output.exists() else 0
-                if size and size == last_size and _pdf_complete(output):
-                    break
-                last_size = size
-                time.sleep(0.5)
-        finally:
-            if proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
-        if not _pdf_complete(output):
-            raise ResuError("The browser did not produce a complete PDF; use the browser's Save as PDF instead")
+        # A temporary file avoids pipes held open by browser helpers. Read only a
+        # bounded tail and report allow-listed diagnoses, never raw browser logs.
+        with tempfile.TemporaryFile(mode="w+b") as diagnostics:
+            try:
+                proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=diagnostics)
+            except OSError as exc:
+                raise ResuError(
+                    f"PDF browser could not start (OS error {exc.errno}). Check RESUSKILL_BROWSER and execution permissions. "
+                    f"HTML is available at {html_path}; open it and use Print → Save as PDF."
+                ) from exc
+            timed_out, exit_code = False, None
+            try:
+                deadline, last_size = time.monotonic() + 90, -1
+                while time.monotonic() < deadline:
+                    exit_code = proc.poll()
+                    if exit_code is not None:
+                        break
+                    size = output.stat().st_size if output.exists() else 0
+                    if size and size == last_size and _pdf_complete(output):
+                        break
+                    last_size = size
+                    time.sleep(0.5)
+                else:
+                    timed_out = True
+            finally:
+                if proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+            if not _pdf_complete(output):
+                diagnostics.seek(0, os.SEEK_END)
+                diagnostics.seek(max(0, diagnostics.tell() - 8192))
+                tail = diagnostics.read(8192).decode("utf-8", errors="replace").lower()
+                reason = "timed out after 90 seconds" if timed_out else f"exited with status {exit_code}"
+                hint = "Check browser compatibility and execution permissions."
+                if any(s in tail for s in ("operation not permitted", "permission denied", "sandbox")):
+                    hint = "Browser logs indicate a possible permission or sandbox restriction. Use an environment that permits launching Chrome/Edge."
+                elif any(s in tail for s in ("error while loading shared libraries", "library not loaded", "cannot open shared object")):
+                    hint = "Browser logs indicate a missing system library. Repair the browser installation."
+                raise ResuError(
+                    f"The browser did not produce a complete PDF ({reason}). {hint} "
+                    f"Existing PDFs were preserved. HTML: {html_path}. Open it and use Print → Save as PDF, "
+                    "or run `doctor --pdf-smoke` to check the local browser."
+                )
         os.replace(output, pdf_path)
     return pdf_path
 

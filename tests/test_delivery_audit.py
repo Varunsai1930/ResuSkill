@@ -136,10 +136,30 @@ class PdfDeliveryTests(IsolatedHome):
     def test_browser_launch_failure_preserves_existing_pdf(self):
         with mock.patch.object(render, "find_browser", return_value="browser"), \
                 mock.patch.object(render.subprocess, "Popen", side_effect=OSError("launch failed")):
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(ResuError, "could not start"):
                 render.print_pdf(self.html, self.pdf)
         self.assertEqual(self.pdf.read_bytes(), b"previous PDF")
         self.assertEqual(sorted(p.name for p in Path(self._tmp).iterdir()), ["resume.html", "resume.pdf"])
+
+    def test_failure_reports_exit_code_and_allowlisted_hint_not_raw_logs(self):
+        proc = mock.Mock()
+        proc.poll.return_value = 23
+
+        def fail(command, **kwargs):
+            kwargs["stderr"].write(b"private@example.test token=secret\nPermission denied\n")
+            return proc
+
+        with mock.patch.object(render, "find_browser", return_value="browser"), \
+                mock.patch.object(render.subprocess, "Popen", side_effect=fail):
+            with self.assertRaises(ResuError) as caught:
+                render.print_pdf(self.html, self.pdf)
+        message = str(caught.exception)
+        self.assertIn("status 23", message)
+        self.assertIn("permission or sandbox", message)
+        self.assertIn(str(self.html), message)
+        self.assertNotIn("secret", message)
+        self.assertNotIn("private@example", message)
+        self.assertEqual(self.pdf.read_bytes(), b"previous PDF")
 
     def test_a_paused_partial_write_is_not_treated_as_finished(self):
         proc = mock.Mock()
@@ -165,7 +185,7 @@ class PdfDeliveryTests(IsolatedHome):
         proc.wait.side_effect = [subprocess.TimeoutExpired("browser", 5), 0]
         with mock.patch.object(render, "find_browser", return_value="browser"), self.browser(b"%PDF-1.4\npartial", proc), \
                 mock.patch.object(proc, "poll", return_value=None), mock.patch.object(render.time, "monotonic", side_effect=[0, 91]):
-            with self.assertRaisesRegex(ResuError, "complete PDF"):
+            with self.assertRaisesRegex(ResuError, "timed out after 90 seconds"):
                 render.print_pdf(self.html, self.pdf)
         proc.terminate.assert_called_once()
         proc.kill.assert_called_once()

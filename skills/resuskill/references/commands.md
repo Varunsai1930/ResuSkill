@@ -68,3 +68,5 @@ Review state: **draft** (not approved), **approved**, **stale** (profile, job, e
 ## Environment
 - `RESUSKILL_HOME`: data directory (default `~/.resuskill`).
 - `RESUSKILL_BROWSER`: path to a Chromium-based browser for `--pdf`.
+
+PDF failures report launch errors, exit status or timeout and a bounded diagnosis without printing raw browser logs. Previous PDFs and provenance remain intact. The generated HTML is retained for manual Print → Save as PDF. If the host restricts browser launching, follow that host's permissions flow; do not disable browser sandbox protections.
