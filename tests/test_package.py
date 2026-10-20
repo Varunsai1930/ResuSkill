@@ -123,7 +123,8 @@ class PackageFlowTests(IsolatedHome):
         edited = copy.deepcopy(profile.load())
         edited["experience"][0]["bullets"][1]["text"] = "Reduced report time by 40% with PostgreSQL indexes"
         profile.save(edited)
-        render.render(self.job_id)
+        with self.assertRaises(ResuError):
+            render.render(self.job_id)
         self.assertEqual(digest(folder), before)
         self.assertIn("35%", (folder / "resume.html").read_text())
         with self.assertRaises(ResuError):

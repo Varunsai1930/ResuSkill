@@ -65,6 +65,8 @@ Answer labels: **From profile**, **AI draft**, **User answer**, **Missing inform
 | `$RS track JOB saved\|applied\|assessment\|interview\|rejected\|offer\|withdrawn [--note "..."]` | Update status; `applied` requires a current approved package and freezes a snapshot |
 | `$RS note JOB "text"` | Add a tracking note |
 
+Rendering revalidates the selected resume against current profile facts before changing existing export files. A changed source can require a corrected proposal before another export. Historical snapshots stay intact.
+
 Review state: **draft** (not approved), **approved**, **stale** (profile, job, evidence, overrides or validation policy changed after approval). A requirements review is required; an explicitly saved empty list is valid for a description with no requirements. Snapshots live in `~/.resuskill/jobs/JOB/snapshots/<time>/` and never change. A snapshot includes the resume PDF only if it was rendered (`render JOB --pdf`) from the approved resume and current profile; otherwise `package.json` records why it was left out.
 
 ## Environment

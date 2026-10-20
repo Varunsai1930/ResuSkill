@@ -433,6 +433,15 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, styl
     prof = profile_mod.load()
     pkg = package_mod.load(job_id)
     proposal = package_mod.load_proposal(job_id)
+    selected = (proposal or {}).get('proposal') if use_proposal else pkg.get('resume')
+    if use_proposal and not selected:
+        raise ResuError("No resume proposal to preview")
+    if selected:
+        missing = _missing_refs(prof, selected)
+        if missing:
+            raise ResuError(f"Resume refers to entries no longer in the profile: {', '.join(missing)}. Propose a new draft.")
+        selected, _ = validate.validate_proposal(prof, job, selected)
+    # Preflight before touching old exports or invoking the PDF browser.
     folder = out_dir(job_id)
     settings = style_mod.normalize(style) if style is not None else style_mod.saved(folder)
     outputs: dict[str, str] = {}
@@ -444,12 +453,12 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, styl
     if use_proposal:
         if not proposal:
             raise ResuError("No resume proposal to preview")
-        resume, target = proposal["proposal"], folder / "preview.html"
+        resume, target = selected, folder / "preview.html"
     else:
         if not pkg.get("resume"):
             outputs["note"] = "No accepted resume yet; only the review page was written. Use --proposal to preview."
             return outputs
-        resume, target = pkg["resume"], folder / "resume.html"
+        resume, target = selected, folder / "resume.html"
         state = package_mod.review_state(job, pkg, prof)
         if state != package_mod.APPROVED:
             outputs["note"] = f"Package is {state.upper()}; this resume has not been approved in its current form."

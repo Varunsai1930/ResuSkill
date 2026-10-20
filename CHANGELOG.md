@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Revalidate the selected resume against current sources before rendering. Reject stale unsupported claims before replacing prior HTML, styling or PDFs.
+
 - Fix ATS PDF comparison accepting changed decimals, signs and contact separators after punctuation was discarded. Preserve meaningful punctuation and word boundaries while normalizing whitespace and typographic variants.
 
 - Add read-only `ats` preflight for current-source validation, required/preferred keyword groups with any/all semantics, evidence-backed omissions, contact/structure warnings and optional actual-PDF text checks. Keep unknowns explicit and avoid ATS-score or hiring predictions.
