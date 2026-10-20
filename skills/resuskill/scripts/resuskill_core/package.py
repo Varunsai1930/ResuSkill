@@ -79,7 +79,43 @@ def save(job_id: str, pkg: dict, content_changed: bool = True) -> None:
 
 
 def load_proposal(job_id: str) -> dict | None:
-    return store.read_json(store.job_dir(job_id) / "proposal.json")
+    record = store.read_json(store.job_dir(job_id) / "proposal.json")
+    if record is None:
+        return None
+    store.check_version(record, "resume proposal")
+    problems = []
+    for key, kind in (("proposal", dict), ("created_at", str), ("profile_revision", int),
+                      ("job_revision", int), ("warnings", list)):
+        if type(record.get(key)) is not kind:
+            problems.append(key)
+    if not problems:
+        if record['profile_revision'] < 1 or record['job_revision'] < 1:
+            problems.append('revision')
+        if any(not isinstance(w, str) for w in record['warnings']):
+            problems.append('warnings')
+        resume = record['proposal']
+        try:
+            input_schema.check(resume, input_schema.RESUME, "stored resume proposal")
+        except ResuError as exc:
+            problems.extend(exc.details)
+        else:
+            for section in ('experience', 'projects', 'education', 'certifications', 'skills'):
+                if type(resume.get(section)) is not list:
+                    problems.append(section)
+            for section in ('experience', 'projects'):
+                for item in resume.get(section) or []:
+                    if type(item.get('entry')) is not str or type(item.get('bullets')) is not list:
+                        problems.append(section + '.entry/bullets')
+                        continue
+                    for bullet in item['bullets']:
+                        if type(bullet.get('text')) is not str or type(bullet.get('sources')) is not list:
+                            problems.append(section + '.bullet.text/sources')
+            summary = resume.get('summary')
+            if summary is not None and (type(summary.get('text')) is not str or type(summary.get('sources')) is not list):
+                problems.append('summary.text/sources')
+    if problems:
+        raise ResuError("Stored resume proposal is damaged; restore a valid backup or propose a new draft. Nothing was changed.", problems)
+    return record
 
 
 def review_state(job: dict, pkg: dict, prof: dict | None) -> str:

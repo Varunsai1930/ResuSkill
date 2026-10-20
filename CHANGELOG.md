@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate stored proposal records at the shared read boundary. Malformed metadata or resume fields now produce recovery errors across show, render, batch and ATS commands without partial exports or record changes.
+
 - Revalidate the selected resume against current sources before rendering. Reject stale unsupported claims before replacing prior HTML, styling or PDFs.
 
 - Fix ATS PDF comparison accepting changed decimals, signs and contact separators after punctuation was discarded. Preserve meaningful punctuation and word boundaries while normalizing whitespace and typographic variants.
