@@ -49,6 +49,7 @@ def _check_stored(job, folder: str) -> None:
     if job["id"] != folder:
         raise ResuError(f"Stored job id {job['id']!r} does not match its folder {folder!r}; "
                         "a copied folder must keep its original name or be removed")
+    _check_auxiliary(job)
     if 'listing' in job:
         listing.normalize(job['listing'])
     try:
@@ -70,6 +71,40 @@ def _check_stored(job, folder: str) -> None:
             _validate_criterion(criterion, where, errors)
     if errors:
         raise ResuError("Stored job has invalid requirements; restore a valid backup", errors)
+
+
+def _check_auxiliary(job: dict) -> None:
+    """Check review metadata before checklist/answer code dereferences it."""
+    from . import questions as q_mod
+
+    specs = {
+        'evidence': {'*': {'sources': [str], 'profile_revision': int,
+                           'confirmed_at': str, 'source_hashes': input_schema.nullable({'*': str})}},
+        'overrides': {'*': {'status': str, 'reason': str, 'at': str, 'profile_revision': int}},
+        'questions': [{'id': str, 'text': str, 'required': bool, 'limit': input_schema.nullable(int),
+                       'limit_unit': str, 'category': str, 'factual_key': input_schema.nullable(str), 'added_at': str}],
+    }
+    try:
+        input_schema.check({key: job[key] for key in specs if key in job}, specs, 'stored job review metadata')
+    except ResuError as exc:
+        raise ResuError('Stored job review metadata is damaged; restore a valid backup. Nothing was changed.', exc.details) from exc
+    problems = []
+    for key, override in (job.get('overrides') or {}).items():
+        if (override.get('status') not in ('met', 'unmet', 'unknown')
+                or not override.get('reason') or type(override.get('profile_revision')) is not int):
+            problems.append('overrides.' + key)
+    seen = set()
+    for question in job.get('questions') or []:
+        qid = question.get('id', '')
+        if (not re.fullmatch(r'q[1-9]\d*', qid) or qid in seen or not question.get('text')
+                or type(question.get('required')) is not bool
+                or question.get('category') not in q_mod.CATEGORIES
+                or question.get('limit_unit') not in ('chars', 'words')
+                or (question.get('limit') is not None and question['limit'] <= 0)):
+            problems.append('questions.' + qid)
+        seen.add(qid)
+    if problems:
+        raise ResuError('Stored job review metadata is incomplete; restore a valid backup. Nothing was changed.', problems)
 
 
 def save(job: dict) -> None:

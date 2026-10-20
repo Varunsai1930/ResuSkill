@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject malformed job evidence, overrides and question metadata before checklist or review code reads it. Preserve legacy evidence records that predate source hashes.
+
 - Validate stored profile structures and metadata before using them. Damaged or unnormalized records produce recovery errors without regenerating IDs, changing facts or overwriting data.
 
 - Validate stored proposal records at the shared read boundary. Malformed metadata or resume fields now produce recovery errors across show, render, batch and ATS commands without partial exports or record changes.
