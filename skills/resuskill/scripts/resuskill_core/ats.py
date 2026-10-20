@@ -49,8 +49,19 @@ class VisibleText(HTMLParser):
 
 
 def _flat(text):
-    # Ignore typography and whitespace differences introduced by PDF extraction.
-    return ''.join(c for c in unicodedata.normalize('NFKC', text).casefold() if c.isalnum())
+    # Preserve decimal points, signs and email separators. Deleting punctuation
+    # can make different claims (35% and 3.5%) compare equal.
+    normalized = unicodedata.normalize('NFKC', text).casefold().translate(str.maketrans({
+        '\u2010': '-', '\u2011': '-', '\u2012': '-', '\u2013': '-', '\u2014': '-', '\u2212': '-',
+        '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
+    }))
+    return re.sub(r'\s+', ' ', normalized).strip()
+
+
+def _retained(value, text):
+    # Avoid accepting a contact number as the prefix of a different number.
+    value = _flat(value)
+    return bool(value and re.search(r'(?<!\w)' + re.escape(value) + r'(?!\w)', text))
 
 
 def extract_pdf(path):
@@ -192,7 +203,7 @@ def check(job_id, use_proposal=False, pdf=None):
             for cert_id in resume['certifications']:
                 cert = next(c for c in prof['certifications'] if c['id'] == cert_id)
                 expected.append((cert_id, cert['name']))
-            missing = [{'item': key, 'text': value} for key, value in expected if _flat(value) not in flattened]
+            missing = [{'item': key, 'text': value} for key, value in expected if not _retained(value, flattened)]
             pdf_terms = find_terms(text, extra)
             missing_skills = sorted(find_terms(', '.join(resume['skills']), extra) - pdf_terms)
             pdf_result = {'status': 'review_needed' if missing or missing_skills or not flattened else 'text_checks_passed',

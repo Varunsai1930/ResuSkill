@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix ATS PDF comparison accepting changed decimals, signs and contact separators after punctuation was discarded. Preserve meaningful punctuation and word boundaries while normalizing whitespace and typographic variants.
+
 - Add read-only `ats` preflight for current-source validation, required/preferred keyword groups with any/all semantics, evidence-backed omissions, contact/structure warnings and optional actual-PDF text checks. Keep unknowns explicit and avoid ATS-score or hiring predictions.
 
 - Add `batch-export` for selected pending proposals or accepted resumes: validate all drafts first, produce an index/report/ZIP, preserve approval state, and report PDF failures with HTML fallback.

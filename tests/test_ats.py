@@ -156,3 +156,14 @@ class AtsTests(IsolatedHome):
         self.assertEqual(result['pdf']['missing_skills'], [])
         self.assertTrue(any(b['item'] == 'exp-1.bullet.2' for b in result['pdf']['missing_blocks']))
         self.assertIn('pdf_content_mismatch', [i['code'] for i in result['issues']])
+
+    def test_pdf_comparison_preserves_numbers_signs_and_email_separators(self):
+        job = self.ready()
+        text = self.extracted(job)
+        for old, new in [('35%', '3.5%'), ('35%', '-35%'),
+                         ('1,200', '12.00'), ('jordan@example.com', 'jordanexample.com'),
+                         ('+1 555 0100', '+1 555 01000')]:
+            with self.subTest(change=(old, new)), patch.object(ats, 'extract_pdf', return_value=(text.replace(old, new), 'test-parser')):
+                result = ats.check(job, True, 'sample.pdf')
+                self.assertEqual(result['pdf']['status'], 'review_needed')
+                self.assertIn('pdf_content_mismatch', [i['code'] for i in result['issues']])
