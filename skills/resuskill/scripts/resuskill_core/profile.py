@@ -77,6 +77,22 @@ def load(required: bool = True) -> dict | None:
         if not isinstance(data, dict) or not isinstance(data.get("_meta"), dict):
             raise ResuError("Stored profile has no valid metadata; restore a profile backup")
         store.check_version(data, "profile", data["_meta"].get("schema", 1))
+        meta = data['_meta']
+        counters = meta.get('id_counters', {})
+        if (type(meta.get('revision')) is not int or meta['revision'] < 1
+                or not isinstance(meta.get('updated_at', ''), str)
+                or not isinstance(counters, dict)
+                or any(not isinstance(k, str) or type(v) is not int or v < 1 for k, v in counters.items())):
+            raise ResuError("Stored profile metadata is damaged; restore a valid profile backup. Nothing was changed.")
+        try:
+            clean, _ = normalize(data)
+        except ResuError as exc:
+            raise ResuError("Stored profile is damaged; restore a valid profile backup. Nothing was changed.", exc.details) from exc
+        # Input JSON may omit fields or use shorthand, but stored data must already
+        # have assigned IDs and normalized structures. Never repair them on a read.
+        if ({k: v for k, v in clean.items() if k != '_meta'}
+                != {k: v for k, v in data.items() if k != '_meta'}):
+            raise ResuError("Stored profile has incomplete or unnormalized fields; restore a valid profile backup. Nothing was changed.")
     return data
 
 

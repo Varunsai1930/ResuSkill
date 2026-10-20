@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate stored profile structures and metadata before using them. Damaged or unnormalized records produce recovery errors without regenerating IDs, changing facts or overwriting data.
+
 - Validate stored proposal records at the shared read boundary. Malformed metadata or resume fields now produce recovery errors across show, render, batch and ATS commands without partial exports or record changes.
 
 - Revalidate the selected resume against current sources before rendering. Reject stale unsupported claims before replacing prior HTML, styling or PDFs.
