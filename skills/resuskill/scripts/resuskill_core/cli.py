@@ -461,6 +461,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("jobs", parents=[common], help="tracker table of all jobs")
     p.set_defaults(func=cmd_jobs)
 
+    p = sub.add_parser("insights", parents=[common], help="recorded outcomes and recurring current-profile gaps")
+    p.set_defaults(func=cmd_insights)
+
     p = sub.add_parser("checklist", parents=[common], help="deterministic requirement checklist")
     p.add_argument("job")
     p.set_defaults(func=cmd_checklist)
@@ -582,6 +585,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_insights(args):
+    from . import insights
+    result = insights.report()
+    out(result, args.json, insights.text_report(result))
+    return 1 if result["errors"] else 0
 
 
 def cmd_ats(args):

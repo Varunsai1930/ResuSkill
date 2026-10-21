@@ -159,3 +159,7 @@ After preparing a proposal for each selected job, run `batch-export JOB1 JOB2 --
 ### ATS preflight
 
 Use `ats JOB --proposal --pdf /path/to/resume.pdf` before sharing a tailored draft. It checks current source validity, required/preferred skill groups, missing contact/education details, and text retained in the actual PDF. Supported omissions come with sources; unconfirmed skills stay out. PDF checks need local Poppler or optional `pypdf`, and are explicitly marked unrun when unavailable. This is an offline review aid with concrete findings, not a simulated employer score or a guarantee of parsing or selection. See the [command reference](skills/resuskill/references/commands.md#ats-preflight).
+
+## Learning from recorded results
+
+Ask “What gaps keep appearing across my saved jobs?” or run `python3 skills/resuskill/scripts/resuskill.py insights`. The report counts recorded application statuses and groups recurring requirements, separating missing evidence from confirmed missing skills. It shows the jobs and evidence behind each finding, preserves alternative requirements, and recalculates against your current profile. It does not infer rejection causes or claim a conversion rate from incomplete tracking history. Add `--json` for structured output.

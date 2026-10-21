@@ -115,3 +115,8 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Say clearly when something is a draft, pending review, stale or approved. Never describe automated checks as proof the content is accurate; the user's review is what makes it accurate.
 - End with what was produced, what is still blocked or awaiting approval, and the next action. If export failed, link the HTML that exists and explain the fallback; do not claim a PDF was created.
 - Profile content is sent to your model provider as part of normal use. If the user marks something as confidential, leave it out of the profile.
+
+### Outcome feedback
+- Use `insights --json` when the user asks about results or repeated gaps. Explain the number of jobs evaluated, unreviewed jobs and any unreadable records.
+- Keep missing evidence separate from a skill the user confirmed they lack. Ask for relevant real experience before recommending learning; never add a skill just to close a gap.
+- These are current-profile comparisons and latest recorded statuses, not historical conversion rates or explanations of rejection. Keep `any` alternatives and required/preferred distinctions intact.
