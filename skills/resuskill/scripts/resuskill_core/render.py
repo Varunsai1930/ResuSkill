@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from difflib import SequenceMatcher
 from html import escape
 from pathlib import Path
 from string import Template
@@ -202,31 +203,79 @@ h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:17px; margin:28px 0 10px; 
 .prop { background:var(--add); border-radius:6px; padding:8px; }
 .label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
 .excerpt { color:var(--muted); font-style:italic; }
+.claim-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+ins { background:var(--add); text-decoration:underline; }
+del { text-decoration:line-through; }
+.checks { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; }
 table { width:100%; border-collapse:collapse; } td, th { text-align:left; padding:6px; border-bottom:1px solid var(--line); vertical-align:top; }
 """
 
 
-def _bullet_pairs(prof: dict, resume: dict | None, heading: str) -> str:
+def _word_changes(original: str, proposed: str) -> str:
+    """Escaped word-level changes; this describes wording, never semantic truth."""
+    before, after = original.split(), proposed.split()
+    parts = []
+    for tag, a, b, c, d in SequenceMatcher(None, before, after, autojunk=False).get_opcodes():
+        if tag in ('delete', 'replace'):
+            parts.append(f'<del>{_e(" ".join(before[a:b]))}</del>')
+        if tag in ('insert', 'replace'):
+            parts.append(f'<ins>{_e(" ".join(after[c:d]))}</ins>')
+        if tag == 'equal':
+            parts.append(_e(' '.join(after[c:d])))
+    return ' '.join(parts)
+
+
+def _claim_card(prof: dict, claim: dict, label: str, problems: list[str]) -> str:
+    sources = profile_mod.sources(prof)
+    cited = claim.get('sources') or []
+    original = validate.originals(prof, cited)
+    source_rows = []
+    for sid in cited:
+        source = sources.get(sid)
+        if source:
+            owner = sources.get(source.get('entry'), {}).get('text', '')
+            source_rows.append(f'<li><b>{_e(sid)}</b> · {_e(owner or source["kind"])}'
+                               f'<div class="claim-text">{_e(source["text"])}</div></li>')
+        else:
+            source_rows.append(f'<li class="unmet">{_e(sid)} — missing from current profile</li>')
+    unchanged = len(cited) == 1 and validate.same_text(original, claim['text'])
+    transformation = 'Unchanged wording' if unchanged else 'Reworded or combined sources'
+    verdict = ('<b class="unmet">Checks need attention</b><ul>'
+               + ''.join(f'<li>{_e(p)}</li>' for p in problems) + '</ul>') if problems else (
+                   '<b>Current rule checks passed</b> · source references and detectable numbers, '
+                   'technologies and credentials; not proof of meaning.')
+    changes = '' if unchanged else (
+        '<details><summary>Wording changes: deleted / added</summary>'
+        f'<p>{_word_changes(original, claim["text"])}</p></details>')
+    return (f'<article class="card"><div class="grid"><div class="orig"><div class="label">Current profile sources</div>'
+            f'<ul>{"".join(source_rows) or "<li>No sources cited.</li>"}</ul></div>'
+            f'<div class="prop"><div class="label">{_e(label)}</div><div class="claim-text">{_e(claim["text"])}</div></div></div>'
+            f'<p>{transformation}</p>{changes}<div class="checks">{verdict}'
+            '<p class="meta">Meaning, attribution and real-world accuracy are not checked automatically. '
+            'Confirm that the sources support this exact claim, including your role and the outcome.</p></div></article>')
+
+
+def _bullet_pairs(job: dict, prof: dict, resume: dict | None, heading: str) -> str:
     if not resume:
         return f"<h2>{_e(heading)}</h2><p class='meta'>None.</p>"
     sources = profile_mod.sources(prof)
     html = [f"<h2>{_e(heading)}</h2>"]
+    try:
+        _, warnings = validate.validate_proposal(prof, job, resume)
+        problems = []
+    except ResuError as exc:
+        problems, warnings = exc.details or [str(exc)], []
+    # Full validation includes entry ownership. An invalid resume has no passing cards.
+    if warnings:
+        html.append('<ul>' + ''.join(f'<li>{_e(w)}</li>' for w in warnings) + '</ul>')
     if resume.get("summary"):
-        html.append(
-            f"<div class='card grid'><div class='orig'><div class='label'>Sources</div>{_e(validate.originals(prof, resume['summary']['sources']))}</div>"
-            f"<div class='prop'><div class='label'>Summary</div>{_e(resume['summary']['text'])}</div></div>"
-        )
+        html.append(_claim_card(prof, resume['summary'], 'Summary', problems))
     for section in ("experience", "projects"):
         for item in resume.get(section) or []:
             entry = sources.get(item["entry"], {})
             html.append(f"<h3>{_e(entry.get('text', item['entry']))} <span class='meta'>({_e(item['entry'])})</span></h3>")
             for bullet in item["bullets"]:
-                original = validate.originals(prof, bullet["sources"])
-                same = " <span class='meta'>(unchanged)</span>" if validate.same_text(original, bullet["text"]) else ""
-                html.append(
-                    f"<div class='card grid'><div class='orig'><div class='label'>Original · {_e(', '.join(bullet['sources']))}</div>{_e(original)}</div>"
-                    f"<div class='prop'><div class='label'>Proposed{same}</div>{_e(bullet['text'])}</div></div>"
-                )
+                html.append(_claim_card(prof, bullet, 'Resume claim', problems))
     html.append(f"<p><b>Skills shown:</b> {_e(', '.join(resume.get('skills') or []))}</p>")
     return "".join(html)
 
@@ -249,17 +298,25 @@ def review_html(job: dict, prof: dict, pkg: dict, proposal: dict | None) -> str:
         saved = pkg["answers"].get(a["id"]) or {}
         pending_answer = pkg["answer_proposals"].get(a["id"])
         shown = saved or pending_answer or {}
-        cited = shown.get("sources") or []
-        evidence = f"<p class='meta'>Sources: {_e(validate.originals(prof, cited))}</p>" if cited else ""
+        question = next(q for q in job['questions'] if q['id'] == a['id'])
+        def draft_card(record, label):
+            problems = validate.validate_answer(prof, job, record['text'], record['sources'],
+                                                question.get('limit'), question.get('limit_unit', 'chars'))
+            refusal = package_mod._draft_refusal(question)
+            if refusal:
+                problems.append(refusal)
+            return _claim_card(prof, record, label, problems)
+        is_draft = bool(shown) and (shown.get('source') == 'ai_draft' or not saved)
+        content = draft_card(shown, a['label']) if is_draft else (
+            f'<div class="claim-text">{_e(a["text"])}</div>'
+            '<p class="meta">Not an AI claim check: this value is from the user/profile, skipped, or still unresolved.</p>')
         draft = ""
         if saved and pending_answer:
-            draft_sources = validate.originals(prof, pending_answer.get("sources") or [])
-            draft = (f"<p><b>Replacement draft (pending review)</b><br>{_e(pending_answer['text'])}</p>"
-                     f"<p class='meta'>Sources: {_e(draft_sources)}</p>")
+            draft = draft_card(pending_answer, 'Replacement draft (pending review)')
         answer_rows.append(
             f"<tr><td>{_e(a['id'])}{' *' if a['required'] else ''}</td><td>{_e(a['question'])}</td>"
             f"<td><span class='pill {'met' if a['resolved'] else 'unknown'}'>{_e(a['label'])}</span><br>"
-            f"{_e(a['text'])}{evidence}{draft}</td></tr>")
+            f"{content}{draft}</td></tr>")
     answer_rows = "".join(answer_rows) or "<tr><td colspan=3 class='meta'>No questions added.</td></tr>"
     pending = proposal["proposal"] if proposal else None
     observation = listing.assess(job)
@@ -278,8 +335,10 @@ profile r{prof['_meta']['revision']} · job r{job['revision']}</p>
 <p><span class="pill met">{counts['met']} met</span> <span class="pill unmet">{counts['unmet']} unmet</span>
 <span class="pill unknown">{counts['unknown']} unknown</span></p>
 <div class="card"><table><tr><th>Status</th><th>Requirement</th><th>Basis / evidence</th></tr>{''.join(rows) or '<tr><td colspan=3 class=meta>No requirements saved.</td></tr>'}</table></div>
-{_bullet_pairs(prof, pkg.get('resume'), 'Accepted resume')}
-{_bullet_pairs(prof, pending, 'Latest proposal (not accepted)') if pending and pending != pkg.get('resume') else ''}
+<p class="meta">Sources below are from the current profile, not necessarily the version used to draft the text.
+Rule checks run again for this review; they do not approve content or clear a stale approval.</p>
+{_bullet_pairs(job, prof, pkg.get('resume'), 'Accepted resume')}
+{_bullet_pairs(job, prof, pending, 'Latest proposal (not accepted)') if pending and pending != pkg.get('resume') else ''}
 <h2>Answers</h2>
 <div class="card"><table><tr><th>ID</th><th>Question</th><th>Answer</th></tr>{answer_rows}</table></div>
 <p class="meta">Automated checks catch invented numbers, technologies and credentials. They cannot judge meaning: read every proposed line against its original.</p>

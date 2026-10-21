@@ -67,6 +67,8 @@ Answer labels: **From profile**, **AI draft**, **User answer**, **Missing inform
 
 Rendering revalidates the selected resume against current profile facts before changing existing export files. A changed source can require a corrected proposal before another export. Historical snapshots stay intact.
 
+The review page shows named current sources, wording differences and fresh rule-check results for summaries, bullets and AI answers (accepted and replacement drafts separately). User/profile answers are not labelled as AI-validated. Missing sources and rule failures remain visible for non-selected drafts. Checks cannot establish meaning, attribution or real-world truth, and viewing the page never changes approval. An invalid resume's cards show the resume validation issues instead of passing badges.
+
 Review state: **draft** (not approved), **approved**, **stale** (profile, job, evidence, overrides or validation policy changed after approval). A requirements review is required; an explicitly saved empty list is valid for a description with no requirements. Snapshots live in `~/.resuskill/jobs/JOB/snapshots/<time>/` and never change. A snapshot includes the resume PDF only if it was rendered (`render JOB --pdf`) from the approved resume and current profile; otherwise `package.json` records why it was left out.
 
 ## Environment

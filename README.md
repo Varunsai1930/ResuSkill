@@ -113,7 +113,7 @@ The agent asks before it changes your profile, shows you every rewritten line be
 
 For each job, under `~/.resuskill/jobs/<job-id>/out/`:
 
-- `review.html`: checklist with evidence, original-vs-proposed bullets, every answer and its label.
+- `review.html`: checklist, claim-by-claim sources and wording changes, current rule-check results, and every answer with its label. Meaning and attribution remain human review tasks; a passing rule check is not approval.
 - `resume.html`: single-column A4 resume; names, employers, dates and degrees always come from your profile.
 - `<Your_Name>_Resume.pdf`: printed with your local Chrome/Edge (or use Print → Save as PDF).
 - `snapshots/<time>/`: a frozen copy of what you submitted, unaffected by later profile edits.

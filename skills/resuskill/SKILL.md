@@ -98,6 +98,7 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 
 ### 6. Review and approval
 - Run `package check JOB`. Resolve blockers with the user, then run `render JOB` and have the user review `review.html` and `resume.html`.
+- Use the review's claim cards to compare each summary, bullet and AI answer with its named sources and wording changes. Checks rerun against the current profile; sources may have changed since drafting. Review meaning and attribution yourself, then let the user decide. A passing rule check does not clear a stale approval.
 - Check exit status: `package check` returns 1 when blocked, including with `--json`. Read `blockers` and `warnings`; disclose unaccepted drafts and intentionally omitted content. Check the actual generated files before saying the work is complete.
 - Run `package approve JOB` only after the user explicitly approves the final package.
 - `render JOB --pdf` writes the PDF with a local Chrome/Edge; if that fails, tell the user to open `resume.html` and use Print → Save as PDF.
