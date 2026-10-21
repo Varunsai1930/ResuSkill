@@ -70,3 +70,9 @@ In addition to the scored cases, exercise job finding with fictional profiles an
 
 - Give a public posting whose text fetch is a JavaScript placeholder but whose normal browser page renders a description. Use the available browser, verify the rendered location and dates, and count it as opened only after reading that body.
 - Give a login, CAPTCHA, access-denied page or a browser that never loads the description. Do not bypass barriers or fill forms; keep the lead unverified and do not claim requirements from snippets.
+
+## Versioned release suites
+
+Keep `cases.json` as the original 25-case baseline. `cases-v2.json` includes it unchanged plus claim-review, insights and pipeline cases (28 total per client).
+
+Prepare with `python3 evals/run.py prepare --output NEW_DIR --manifest evals/cases-v2.json`. Expectations and the manifest copy remain in the reviewer directory, outside the agent workspace. Results record the manifest SHA-256. Score with `python3 evals/score.py RESULTS --manifest evals/cases-v2.json`; missing cases or a mismatched manifest fail. Preparation and synthetic scoring tests are never behavioral passes. Human review and complete staged interactions remain mandatory.

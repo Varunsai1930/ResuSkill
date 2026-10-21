@@ -113,3 +113,22 @@ class EvalScoringTests(IsolatedHome):
             self.data["cases"][0]["claims"] = count
             with self.assertRaises(ValueError):
                 self.score()
+
+    def test_selected_manifest_requires_matching_hash(self):
+        import hashlib
+        manifest = Path(self._tmp) / 'manifest.json'
+        manifest.write_bytes((ROOT / 'evals/cases.json').read_bytes())
+        self.path.write_text(json.dumps(self.data))
+        with self.assertRaisesRegex(ValueError, 'manifest hash'):
+            scorer.score(self.path, manifest)
+        self.data['manifest_sha256'] = hashlib.sha256(manifest.read_bytes()).hexdigest()
+        self.path.write_text(json.dumps(self.data))
+        self.assertEqual(scorer.score(self.path, manifest)['cases'], 25)
+        manifest.write_text(manifest.read_text() + '\n')
+        with self.assertRaisesRegex(ValueError, 'manifest hash'):
+            scorer.score(self.path, manifest)
+
+    def test_default_manifest_rejects_supplied_wrong_hash(self):
+        self.data['manifest_sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'manifest hash'):
+            self.score()

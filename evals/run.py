@@ -136,8 +136,15 @@ def setup_case(workspace, case):
     return job_id
 
 
-def prepare(output, selected=None):
-    cases = json.loads((ROOT / "evals/cases.json").read_text(encoding="utf-8"))
+def prepare(output, selected=None, manifest=None):
+    manifest = Path(manifest) if manifest else ROOT / "evals/cases.json"
+    raw = manifest.read_bytes()
+    cases = json.loads(raw)
+    if not isinstance(cases, list) or not cases or any(not isinstance(c, dict) or not re.fullmatch(r"e[0-9]+", c.get("id", "")) or not all(isinstance(c.get(k), str) and c[k] for k in ("prompt", "expected")) for c in cases):
+        raise ValueError("Invalid case manifest")
+    if len({c["id"] for c in cases}) != len(cases):
+        raise ValueError("Duplicate case IDs in manifest")
+    manifest_hash = hashlib.sha256(raw).hexdigest()
     selected = set(selected or [case["id"] for case in cases])
     unknown = selected - {case["id"] for case in cases}
     if unknown:
@@ -185,7 +192,8 @@ def prepare(output, selected=None):
         rows.append({"id": case["id"], "transcript": f"{case['id']}/evidence/transcript.txt",
                      "passed": None, **dict.fromkeys(METRICS), "notes": None})
     write_json(output / "review-template.json", {"client": "codex", "client_version": None, "model": None,
-               "revision": revision, "reviewer": None, "cases": rows})
+               "revision": revision, "reviewer": None, "manifest_sha256": manifest_hash, "cases": rows})
+    shutil.copyfile(manifest, output / "reviewer" / "manifest.json")
     return output
 
 
@@ -322,6 +330,7 @@ def main():
     prep = sub.add_parser("prepare", help="prepare new isolated cases without calling a model")
     prep.add_argument("--output", required=True, help="new directory outside the repository")
     prep.add_argument("--case", action="append", nargs="+", help="case IDs; default all 25")
+    prep.add_argument("--manifest", help="versioned case manifest; default original 25 cases")
     run = sub.add_parser("run", help="capture one prepared case; this calls the configured Codex model")
     run.add_argument("case_dir")
     run.add_argument("--timeout", type=float, default=600)
@@ -332,7 +341,7 @@ def main():
     try:
         if args.action == "prepare":
             selected = [ident for group in (args.case or []) for ident in group]
-            print(prepare(args.output, selected))
+            print(prepare(args.output, selected, args.manifest))
         else:
             result = run_case(args.case_dir, args.timeout, args.codex, args.default_config)
             print(json.dumps(result, indent=2))

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Aggregate human-reviewed agent runs; never manufacture behavioral evidence."""
 
+import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -14,10 +16,18 @@ MINIMUM_OBSERVATIONS = {
 }
 
 
-def score(path):
+def score(path, manifest=None):
     path = Path(path)
     data = json.loads(path.read_text(encoding="utf-8"))
-    expected = {c["id"] for c in json.loads(Path(__file__).with_name("cases.json").read_text(encoding="utf-8"))}
+    manifest_path = Path(manifest) if manifest else Path(__file__).with_name("cases.json")
+    raw = manifest_path.read_bytes()
+    cases = json.loads(raw)
+    expected = {c["id"] for c in cases}
+    if not expected or len(expected) != len(cases):
+        raise ValueError("Manifest must contain unique case IDs")
+    manifest_hash = hashlib.sha256(raw).hexdigest()
+    if (manifest is not None or "manifest_sha256" in data) and data.get("manifest_sha256") != manifest_hash:
+        raise ValueError("Results must identify the selected manifest hash")
     if data.get("client") not in ("claude-code", "codex"):
         raise ValueError("client must be claude-code or codex")
     for key in ("client_version", "model", "revision", "reviewer"):
@@ -28,7 +38,7 @@ def score(path):
         raise ValueError("cases must be a list of result objects")
     ids = [row.get("id") for row in rows]
     if len(ids) != len(set(ids)) or set(ids) != expected:
-        raise ValueError("results must contain each of the 25 case IDs exactly once")
+        raise ValueError("results must contain each selected manifest case ID exactly once")
     totals = dict.fromkeys(("claims", "unsupported_claims", "sensitive_questions", "ai_sensitive_answers",
                            "checklist_decisions", "checklist_agreements", "skipped_required_steps"), 0)
     failures = []
@@ -65,7 +75,7 @@ def score(path):
     for denominator in ("claims", "sensitive_questions", "checklist_decisions"):
         if not totals[denominator]:
             raise ValueError(f"run did not measure {denominator}")
-    return {"client": data["client"], "cases": len(rows), "failures": failures, "totals": totals,
+    return {"manifest_sha256": manifest_hash, "client": data["client"], "cases": len(rows), "failures": failures, "totals": totals,
             "unsupported_claim_rate": totals["unsupported_claims"] / totals["claims"],
             "ai_sensitive_answer_rate": totals["ai_sensitive_answers"] / totals["sensitive_questions"],
             "checklist_agreement": totals["checklist_agreements"] / totals["checklist_decisions"]}
@@ -73,9 +83,11 @@ def score(path):
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) != 2:
-            raise ValueError("usage: python3 evals/score.py results.json")
-        result = score(sys.argv[1])
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("results")
+        parser.add_argument("--manifest")
+        args = parser.parse_args()
+        result = score(args.results, args.manifest)
         print(json.dumps(result, indent=2))
         sys.exit(1 if result["failures"] else 0)
     except (ValueError, TypeError, KeyError, AttributeError, OSError) as exc:

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add isolated copied-install smoke checks to the CI matrix and versioned behavioral case manifests with hash-bound scoring; preserve the original 25-case baseline.
+- Add claim-source review, recurring-gap/outcome reports and the local pipeline overview. Public beta qualification remains pending; see docs/release/status.md.
+
 - Reject malformed job evidence, overrides and question metadata before checklist or review code reads it. Preserve legacy evidence records that predate source hashes.
 
 - Validate stored profile structures and metadata before using them. Damaged or unnormalized records produce recovery errors without regenerating IDs, changing facts or overwriting data.

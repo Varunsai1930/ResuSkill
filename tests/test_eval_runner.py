@@ -192,3 +192,13 @@ class EvalRunnerTests(IsolatedHome):
         self.assertIsNone(result["passed"])
         self.assertEqual(result["review_status"], "pending_human_review")
         self.assertIn("Concrete draft awaiting approval.", (output / "e01/evidence/transcript.txt").read_text())
+
+    def test_versioned_manifest_prepares_additional_cases_without_leaking_answers(self):
+        output = runner.prepare(Path(self._tmp) / 'versioned', ['e26', 'e27', 'e28'], ROOT / 'evals/cases-v2.json')
+        review = json.loads((output / 'review-template.json').read_text())
+        self.assertEqual(len(review['cases']), 3)
+        self.assertEqual(len(review['manifest_sha256']), 64)
+        for ident in ('e26', 'e27', 'e28'):
+            workspace = output / ident / 'workspace'
+            self.assertFalse((workspace / 'manifest.json').exists())
+            self.assertTrue(list((workspace / 'home/jobs').glob('*/job.json')))
