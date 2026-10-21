@@ -108,3 +108,11 @@ Exit 1 on rejected input/current-claim validation or PDF text errors. Warnings, 
 `$RS insights [--json]` reads all readable saved jobs and reports their latest recorded tracking states, plus recurring requirement gaps against the **current** profile. It does not calculate conversion rates or infer why an employer rejected an application. Counts include closed applications and are not a submission-time cohort.
 
 Unknown evidence, confirmed missing skills, other mismatches, user overrides and changed evidence appear separately. Equivalent skill groups retain `any`/`all` semantics; required and preferred requirements remain separate. Recurrence counts distinct jobs, with each requirement ID and its basis available for review. Jobs with no reviewed requirements and unusable records are disclosed. Missing profile leaves outcomes available without evaluating gaps; damaged records produce partial output and exit 1. The command changes no candidate records.
+
+## Pipeline and next actions
+
+`$RS pipeline [--json] [--output NEW_DIR]` shows every readable job's recorded application status, current package review state, listing observation and deadline, checklist counts, package blockers, pending drafts and a suggested next action. Unreadable records remain visible with repair guidance; partial results exit 1. An absent profile leaves package checks explicitly unevaluated.
+
+Actions prioritize damaged data, closed/expired or unverified listings, package blockers, pending drafts and stale approvals. Applied, assessment and interview states suggest checking correspondence and recording progress; they never suggest submitting again. Offers and terminal outcomes have separate actions. These are advisory next steps, not scheduled reminders or automatic follow-ups.
+
+`--output NEW_DIR` creates `index.html` and `report.json` in a new directory; existing directories are refused. The HTML is a local snapshot, with listing sources and expandable fit warnings. Regenerate it after changes. The command does not accept drafts, approve packages, change tracking, contact employers or alter submitted snapshots. Package checks reflect the current profile, not the frozen submitted package.

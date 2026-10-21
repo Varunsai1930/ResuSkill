@@ -163,3 +163,7 @@ Use `ats JOB --proposal --pdf /path/to/resume.pdf` before sharing a tailored dra
 ## Learning from recorded results
 
 Ask “What gaps keep appearing across my saved jobs?” or run `python3 skills/resuskill/scripts/resuskill.py insights`. The report counts recorded application statuses and groups recurring requirements, separating missing evidence from confirmed missing skills. It shows the jobs and evidence behind each finding, preserves alternative requirements, and recalculates against your current profile. It does not infer rejection causes or claim a conversion rate from incomplete tracking history. Add `--json` for structured output.
+
+## See what needs attention
+
+Run `python3 skills/resuskill/scripts/resuskill.py pipeline` for review states, listing freshness, deadlines, blockers and suggested next steps. Add `--output NEW_DIR` for a local HTML overview and JSON report. Applied jobs point to recording progress; stale approvals and pending drafts point back to review. Reports leave application records unchanged and show incomplete data explicitly. They do not schedule reminders or contact employers.

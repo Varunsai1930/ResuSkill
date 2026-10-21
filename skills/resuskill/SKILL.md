@@ -120,3 +120,8 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Use `insights --json` when the user asks about results or repeated gaps. Explain the number of jobs evaluated, unreviewed jobs and any unreadable records.
 - Keep missing evidence separate from a skill the user confirmed they lack. Ask for relevant real experience before recommending learning; never add a skill just to close a gap.
 - These are current-profile comparisons and latest recorded statuses, not historical conversion rates or explanations of rejection. Keep `any` alternatives and required/preferred distinctions intact.
+
+### Pipeline review
+- Use `pipeline --json` when asked what needs attention or what to do next. Use `--output NEW_DIR` for an HTML overview and open the returned `index.html`.
+- Present the suggested next step with its blockers and warnings. Treat it as advice: listing freshness is a recorded observation, and a completed package still needs the user's review and manual submission.
+- For applied/interviewing jobs, ask about correspondence or outcomes when relevant; do not resubmit, message employers or invent follow-up dates. Regenerate the report after updating the underlying records.

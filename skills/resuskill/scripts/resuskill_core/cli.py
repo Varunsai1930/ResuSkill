@@ -461,6 +461,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("jobs", parents=[common], help="tracker table of all jobs")
     p.set_defaults(func=cmd_jobs)
 
+    p = sub.add_parser("pipeline", parents=[common], help="review states, listing freshness, blockers and next actions")
+    p.add_argument("--output", help="export HTML and JSON into a new directory")
+    p.set_defaults(func=cmd_pipeline)
+
     p = sub.add_parser("insights", parents=[common], help="recorded outcomes and recurring current-profile gaps")
     p.set_defaults(func=cmd_insights)
 
@@ -585,6 +589,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_pipeline(args):
+    from . import pipeline
+    result = pipeline.report()
+    if args.output:
+        result["files"] = pipeline.export(result, args.output)
+    text = pipeline.text_report(result)
+    if args.output:
+        text += "\nHTML report: " + result["files"]["html"]
+    out(result, args.json, text)
+    return 1 if result["errors"] else 0
 
 
 def cmd_insights(args):
