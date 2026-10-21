@@ -138,3 +138,22 @@ def load_text(path_arg: str) -> str:
         raise ResuError(f"Input file not found: {path_arg}") from exc
     except (OSError, UnicodeDecodeError) as exc:
         raise ResuError(f"Input file cannot be read: {path_arg} ({exc})") from exc
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def command_lock():
+    """Serialize CLI data operations; unexplained locks are never reclaimed."""
+    lock = home() / '.command-lock'
+    try:
+        lock.mkdir()
+    except FileExistsError:
+        raise ResuError('Another ResuSkill command holds the data lock. If a process crashed, verify it has stopped before manually removing .command-lock. Nothing was changed.') from None
+    try:
+        (lock / 'owner.txt').write_text(f'pid={os.getpid()}\n', encoding='utf-8')
+        yield
+    finally:
+        (lock / 'owner.txt').unlink(missing_ok=True)
+        lock.rmdir()

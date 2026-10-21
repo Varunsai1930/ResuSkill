@@ -116,3 +116,9 @@ Unknown evidence, confirmed missing skills, other mismatches, user overrides and
 Actions prioritize damaged data, closed/expired or unverified listings, package blockers, pending drafts and stale approvals. Applied, assessment and interview states suggest checking correspondence and recording progress; they never suggest submitting again. Offers and terminal outcomes have separate actions. These are advisory next steps, not scheduled reminders or automatic follow-ups.
 
 `--output NEW_DIR` creates `index.html` and `report.json` in a new directory; existing directories are refused. The HTML is a local snapshot, with listing sources and expandable fit warnings. Regenerate it after changes. The command does not accept drafts, approve packages, change tracking, contact employers or alter submitted snapshots. Package checks reflect the current profile, not the frozen submitted package.
+
+## Manual follow-ups
+
+`followup set JOB --date YYYY-MM-DD [--note TEXT] [--id fN]` creates an active follow-up or explicitly reschedules/reactivates an unfinished one. `followup list JOB --json` shows overdue/due-today/upcoming using the local calendar. `followup complete JOB fN` and `followup cancel JOB fN` preserve history; repeating the same completion is harmless. Completed/cancelled entries cannot be reopened. Rejected, withdrawn and offer statuses inactivate reminders; reopening a job does not reactivate them without an explicit set. No notifications or employer messages are sent.
+
+CLI operations on the candidate directory take an exclusive `.command-lock`. A conflicting command refuses without changing records. If a command crashed, first verify no command is still running before manually removing that lock directory. Locks are never automatically reclaimed. Internal Python functions are not a public concurrency interface; use the CLI for writes.

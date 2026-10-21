@@ -6,7 +6,7 @@ import json
 from html import escape
 from pathlib import Path
 
-from . import checklist, jobs, listing, package, profile
+from . import checklist, jobs, listing, package, profile, followups
 from .util import ResuError, now_iso
 
 
@@ -14,10 +14,13 @@ def _next_action(row: dict, has_profile: bool) -> dict:
     status = row['status']
     if status in ('rejected', 'withdrawn'):
         return {'priority': 9, 'code': 'closed', 'text': 'No active application action. Review recorded outcomes when useful.'}
+    due = [f for f in row.get('followups', []) if f['timing'] in ('overdue', 'due_today')]
+    if due:
+        return {'priority': 1, 'code': 'followup_due', 'text': 'Review your scheduled follow-up: ' + due[0]['date'] + ' — ' + due[0]['note']}
     if status == 'offer':
         return {'priority': 1, 'code': 'review_offer', 'text': 'Review the offer and record your decision; no decision is inferred.'}
     if status in ('applied', 'assessment', 'interview'):
-        return {'priority': 2, 'code': 'record_progress', 'text': 'Check your employer correspondence and record the next step or outcome. No follow-up date is recorded here.'}
+        return {'priority': 2, 'code': 'record_progress', 'text': 'Check your employer correspondence and record the next step or outcome. Review any recorded follow-up dates below.'}
     if row['listing']['state'] in ('closed', 'expired'):
         return {'priority': 1, 'code': 'recheck_listing', 'text': 'Recheck the closed or expired posting before spending more time or applying.'}
     if not has_profile:
@@ -53,6 +56,7 @@ def report() -> dict:
         try:
             if row['status'] not in jobs.STATUSES:
                 raise ResuError('Unrecognized tracking status; restore a valid record.')
+            row['followups'] = followups.rows(job)
             row['listing'] = listing.assess(job)
             pkg = package.load(job['id'])
             proposal = package.load_proposal(job['id'])
@@ -99,6 +103,7 @@ def text_report(result: dict) -> str:
         lines.extend([f"\n{row['company']} — {row['title']} ({row['id']})",
                       f"{row['status']} | review: {row['review']} | listing: {observation.get('state', 'unreadable')} | deadline: {observation.get('deadline') or 'unknown'}",
                       'Next: ' + row['next_action']['text']])
+        lines.extend(f"  Follow-up {f['id']}: {f['date']} | {f['timing']} | {f['note']}" for f in row.get('followups', []))
         lines.extend('  Blocker: ' + text for text in row['blockers'])
         lines.extend('  Warning: ' + text for text in row['warnings'])
     lines.extend('Note: ' + note for note in result['notes'])
@@ -124,6 +129,7 @@ def html_report(result: dict) -> str:
                      f'<p><b>{e(row["status"])}</b> · Review: {e(row["review"])} · Listing: {e(observation.get("state", "unreadable"))}</p>'
                      f'<p>Deadline: {e(observation.get("deadline") or "Unknown")} · {source}</p>'
                      f'<p>Checklist: {e(counts)}</p><p class="action"><b>Next:</b> {e(row["next_action"]["text"])}</p>'
+                     + ('<h3>Follow-ups</h3>' + items([f"{f['id']}: {f['date']} · {f['timing']} · {f['note']}" for f in row.get('followups', [])]) if row.get('followups') else '')
                      + ('<h3>Package blockers</h3>' + items(row['blockers']) if row['blockers'] else '')
                      + ('<details><summary>Warnings and fit evidence</summary>' + items(row['warnings']) + '</details>' if row['warnings'] else '')
                      + (f'<p>Pending: {"resume draft; " if row["pending_resume"] else ""}{e(", ".join(row["pending_answers"]))}</p>' if row['pending_resume'] or row['pending_answers'] else '')

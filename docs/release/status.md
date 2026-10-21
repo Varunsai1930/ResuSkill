@@ -17,3 +17,5 @@ Baseline implementation: 0e5c83c. Subsequent milestones require qualification on
 ## Required release evidence
 
 Record exact revision/diff, client/model versions, manifest hash, human reviewer, transcripts, artifacts and scored denominators. Both client suites must pass; review incomplete staged conversations with the actual user, never scripted approval of unseen content. New features extend the versioned suite. Run full CI and copied-install/export checks on the candidate release revision. Publish only after reviewing all results.
+
+Codex captures against committed 99aebc5: e01–e03 failed due to the account usage limit; the runner stopped after three failures. Remaining cases are not run, and no behavioral score is reported.

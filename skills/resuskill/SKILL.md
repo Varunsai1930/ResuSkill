@@ -125,3 +125,8 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Use `pipeline --json` when asked what needs attention or what to do next. Use `--output NEW_DIR` for an HTML overview and open the returned `index.html`.
 - Present the suggested next step with its blockers and warnings. Treat it as advice: listing freshness is a recorded observation, and a completed package still needs the user's review and manual submission.
 - For applied/interviewing jobs, ask about correspondence or outcomes when relevant; do not resubmit, message employers or invent follow-up dates. Regenerate the report after updating the underlying records.
+
+### Follow-up dates
+- Record a date only when the user chooses it: `followup set JOB --date YYYY-MM-DD --note TEXT`. Use `--id` to reschedule an unfinished item explicitly.
+- Show due items from `pipeline` or `followup list JOB`; completing/cancelling a reminder only records a local action. Never infer that an employer was contacted.
+- Offer, rejected and withdrawn jobs inactivate reminders. Reopening does not reactivate them; ask which date the user wants before explicitly setting one again.

@@ -137,3 +137,7 @@ The settings are kept in the job's `out/style.json` and reused for both accepted
 ## Stored data compatibility
 
 This release retains schema version 1. Existing v1 profiles and jobs remain readable. Unsupported schema versions are refused before writes; never relabel a newer file as v1. Back up the data directory before upgrading. Future schema changes need explicit, tested migrations that preserve originals. Approvals from older validation policies become stale and require review; legacy evidence/overrides may also require reconfirmation.
+
+## Follow-ups
+
+Optional `tracking.followups` records have stable `fN` IDs, full calendar `date`, `note`, `state` (`active`, `inactive`, `completed`, `cancelled`), `created_at` and `updated_at`. Legacy jobs without them use an empty list. The CLI manages IDs/timestamps. Follow-ups do not change job revision, package approval or submission snapshots. Offer/rejected/withdrawn transitions inactivate active records.

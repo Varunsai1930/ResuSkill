@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add manual dated follow-ups with preserved completion history and terminal-state suppression; serialize CLI data operations with an explicit local lock.
+
 - Add isolated copied-install smoke checks to the CI matrix and versioned behavioral case manifests with hash-bound scoring; preserve the original 25-case baseline.
 - Add claim-source review, recurring-gap/outcome reports and the local pipeline overview. Public beta qualification remains pending; see docs/release/status.md.
 

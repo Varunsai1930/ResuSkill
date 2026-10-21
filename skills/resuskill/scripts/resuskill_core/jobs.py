@@ -49,6 +49,8 @@ def _check_stored(job, folder: str) -> None:
     if job["id"] != folder:
         raise ResuError(f"Stored job id {job['id']!r} does not match its folder {folder!r}; "
                         "a copied folder must keep its original name or be removed")
+    from . import followups
+    followups.validate(job["tracking"].get("followups", []))
     _check_auxiliary(job)
     if 'listing' in job:
         listing.normalize(job['listing'])

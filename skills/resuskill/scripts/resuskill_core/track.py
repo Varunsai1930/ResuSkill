@@ -18,6 +18,10 @@ def set_status(job_id: str, status: str, note: str = "") -> dict:
         raise ResuError(f"Status must be one of {', '.join(jobs_mod.STATUSES)}")
     job = jobs_mod.load(job_id)
     tracking = job["tracking"]
+    if not isinstance(tracking.get('history', []), list):
+        raise ResuError('Stored tracking history is damaged; restore a valid backup.')
+    from . import followups
+    followups.suppress(job, status)
     if status == "applied":
         if tracking.get("snapshot"):
             raise ResuError(f"Already recorded as applied with snapshot {tracking['snapshot']}")

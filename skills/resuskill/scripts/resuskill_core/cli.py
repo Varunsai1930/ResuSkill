@@ -566,6 +566,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--style", help="validated presentation JSON; saved for later renders of this job ({} resets)")
     p.set_defaults(func=cmd_render)
 
+    p = sub.add_parser("followup", help="manual local follow-up dates")
+    fs = p.add_subparsers(dest="action", required=True)
+    x = fs.add_parser("set", parents=[common])
+    x.add_argument("job")
+    x.add_argument("--date", required=True)
+    x.add_argument("--note", default="")
+    x.add_argument("--id", help="reschedule/reactivate an unfinished follow-up")
+    x = fs.add_parser("list", parents=[common])
+    x.add_argument("job")
+    for action in ("complete", "cancel"):
+        x = fs.add_parser(action, parents=[common])
+        x.add_argument("job")
+        x.add_argument("id")
+    p.set_defaults(func=cmd_followup)
+
     p = sub.add_parser("track", help="set tracking status (applied freezes a snapshot)")
     p.add_argument("job")
     p.add_argument("status", choices=jobs_mod.STATUSES)
@@ -589,6 +604,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_followup(args):
+    from . import followups
+    if args.action == 'set':
+        result = followups.set_followup(args.job, args.date, args.note, args.id)
+    elif args.action == 'list':
+        result = followups.rows(jobs_mod.load(args.job))
+    else:
+        result = followups.finish(args.job, args.id, 'completed' if args.action == 'complete' else 'cancelled')
+    out(result, args.json, json.dumps(result, indent=2, ensure_ascii=False))
 
 
 def cmd_pipeline(args):
@@ -636,7 +662,10 @@ def main(argv=None) -> int:
     if not hasattr(args, "json"):
         args.json = False
     try:
-        result = args.func(args)
+        from contextlib import nullcontext
+        isolated = args.command in ('demo', 'doctor') or (args.command == 'profile' and args.action == 'template')
+        with nullcontext() if isolated else store.command_lock():
+            result = args.func(args)
     except KeyboardInterrupt:
         print("error: interrupted", file=sys.stderr)
         return 130

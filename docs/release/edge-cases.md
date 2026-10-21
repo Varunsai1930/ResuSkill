@@ -9,8 +9,8 @@ Each row records a required invariant and its executable coverage or remaining g
 | Pipeline state | No repeat-submit suggestions; damaged data visible | test_pipeline |
 | Copied installation | Run actual installed copy outside checkout, paths with spaces | tools/check_copy.py; added to nine CI jobs |
 | Evaluation completeness | Missing cases, wrong manifest and incomplete human review cannot pass | test_eval_scoring, test_eval_runner; behavioral runs pending |
-| Concurrent writes | Refuse a conflicting writer; never reclaim unexplained locks | Milestone B pending |
-| Follow-up lifecycle | Dates are explicit; terminal/reopened jobs cannot reactivate silently | Milestone B pending |
+| Concurrent writes | Refuse a conflicting writer; never reclaim unexplained locks | test_followups; 6 focused cases passed, independent review completed |
+| Follow-up lifecycle | Dates are explicit; terminal/reopened jobs cannot reactivate silently | test_followups; 6 focused cases passed, independent review completed |
 | Historical reporting | Fixed submission evidence, honest denominators, chronology validation | Milestone C pending |
 | Imports | Bound preview, explicit updates, idempotent resume after interruption | Milestone D pending |
 | Git evidence | Exact committed text; no repo execution; role/impact attested separately | Milestone E pending |
