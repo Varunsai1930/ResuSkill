@@ -466,6 +466,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_pipeline)
 
     p = sub.add_parser("insights", parents=[common], help="recorded outcomes and recurring current-profile gaps")
+    p.add_argument("--historical", action="store_true")
+    p.add_argument("--from", dest="start", help="inclusive submission date")
+    p.add_argument("--to", dest="end", help="inclusive submission date")
     p.set_defaults(func=cmd_insights)
 
     p = sub.add_parser("checklist", parents=[common], help="deterministic requirement checklist")
@@ -630,9 +633,11 @@ def cmd_pipeline(args):
 
 
 def cmd_insights(args):
-    from . import insights
-    result = insights.report()
-    out(result, args.json, insights.text_report(result))
+    from . import insights, history
+    if (args.start or args.end) and not args.historical:
+        raise ResuError("Date filters require --historical.")
+    result = history.report(args.start, args.end) if args.historical else insights.report()
+    out(result, args.json, history.text_report(result) if args.historical else insights.text_report(result))
     return 1 if result["errors"] else 0
 
 

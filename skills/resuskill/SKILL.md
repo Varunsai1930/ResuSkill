@@ -130,3 +130,7 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 - Record a date only when the user chooses it: `followup set JOB --date YYYY-MM-DD --note TEXT`. Use `--id` to reschedule an unfinished item explicitly.
 - Show due items from `pipeline` or `followup list JOB`; completing/cancelling a reminder only records a local action. Never infer that an employer was contacted.
 - Offer, rejected and withdrawn jobs inactivate reminders. Reopening does not reactivate them; ask which date the user wants before explicitly setting one again.
+
+### Historical outcomes
+- Use `insights --historical` for submission-time comparisons, optionally with inclusive `--from`/`--to` dates. Keep this distinct from current-profile `insights`.
+- Explain cohort, usable-history and frozen-checklist denominators, exclusions and errors. Never replace missing historical evidence with today's profile or infer why an employer rejected someone.
