@@ -134,3 +134,8 @@ For a first try, `demo` creates fictional data and HTML in a separate directory.
 ### Historical outcomes
 - Use `insights --historical` for submission-time comparisons, optionally with inclusive `--from`/`--to` dates. Keep this distinct from current-profile `insights`.
 - Explain cohort, usable-history and frozen-checklist denominators, exclusions and errors. Never replace missing historical evidence with today's profile or infer why an employer rejected someone.
+
+### Reviewed job imports
+- Assemble normalized shortlist JSON from reviewed source material, then run `jobs import-preview`. Show rejected rows, possible duplicates and updates before applying selected row numbers.
+- Require explicit choices for updates or keeping similar jobs separately. Do not treat an imported timestamp as proof of an open vacancy.
+- Apply the unchanged preview and input with `--select` and explicit `--update` mappings. If records changed, regenerate and review; never edit hashes or journals to force an import.

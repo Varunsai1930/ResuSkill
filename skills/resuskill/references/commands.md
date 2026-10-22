@@ -126,3 +126,11 @@ CLI operations on the candidate directory take an exclusive `.command-lock`. A c
 ## Historical outcomes
 
 `insights --historical [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]` builds inclusive cohorts from valid `applied_at` timestamps using the timestamp's own calendar date. Current status, distinct reached stages and frozen submission checklists have separate denominators. Out-of-order, future, contradictory or damaged histories are disclosed and excluded from reached-stage counts. Missing/corrupt snapshots never fall back to the current profile. Percentages require at least ten eligible histories (a display policy, not statistical significance). No rejection causality is inferred. Partial-data errors exit 1; absent submission dates are disclosed as exclusions.
+
+## Reviewed shortlist import
+
+`jobs import-preview --file shortlist.json > preview.json` emits a read-only JSON preview. Review every row, then run `jobs import-apply --file shortlist.json --preview preview.json --select 1 3 [--update 3=JOB]`. Row numbers are one-based. `--select` explicitly approves additions; selecting a possible duplicate without `--update` means keep both. Updates/ambiguous exact matches require `--update ROW=JOB`; exact duplicates are skipped. Never edit a preview to bypass a rejection—regenerate after changing input or saved jobs.
+
+Input is a nonempty list with `company`, `title`, `description`, `source_url`, timezone-aware `observed_at`, optional `location`, paired `source_namespace`/`requisition_id`, and optional reviewed `listing` object. No fetching occurs. Observation time alone does not establish that a listing is open. Identity uses the requisition pair or canonical URL (host/default port/fragment normalized; query/path preserved). Same-title jobs are only possible duplicates.
+
+Apply validates all selected rows before writing. A journal records the complete intended state and supports retries after interruption; retry the same command and preview. Any unexpected record change blocks resume. Updating descriptions clears obsolete requirement review/evidence and increments job revision; package files, tracking and snapshots remain intact, with old approval becoming stale. CLI locking prevents competing imports. Keep previews/journals until an interrupted import is resolved.

@@ -460,6 +460,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("jobs", parents=[common], help="tracker table of all jobs")
     p.set_defaults(func=cmd_jobs)
+    imp = p.add_subparsers(dest='action')
+    x = imp.add_parser('import-preview', parents=[common])
+    x.add_argument('--file', required=True)
+    x.set_defaults(func=cmd_import)
+    x = imp.add_parser('import-apply', parents=[common])
+    x.add_argument('--file', required=True)
+    x.add_argument('--preview', required=True)
+    x.add_argument('--select', type=int, nargs='+', required=True)
+    x.add_argument('--update', action='append', default=[], metavar='ROW=JOB')
+    x.set_defaults(func=cmd_import)
 
     p = sub.add_parser("pipeline", parents=[common], help="review states, listing freshness, blockers and next actions")
     p.add_argument("--output", help="export HTML and JSON into a new directory")
@@ -607,6 +617,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_import(args):
+    from . import imports
+    data = store.load_input(args.file)
+    if args.action == 'import-preview':
+        result = imports.preview(data)
+    else:
+        updates = {}
+        for value in args.update:
+            try:
+                number, jid = value.split('=', 1)
+                number = int(number)
+            except ValueError:
+                raise ResuError('--update must be ROW=JOB.') from None
+            if number in updates:
+                raise ResuError('Duplicate update row.')
+            updates[number] = jid
+        result = imports.apply(data, store.load_input(args.preview), args.select, updates)
+    # Preview is always JSON so it can be saved and passed unchanged to apply.
+    out(result, True)
 
 
 def cmd_followup(args):

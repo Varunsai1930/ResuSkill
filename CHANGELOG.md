@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add offline reviewed shortlist previews and explicit application of selected rows, with duplicate detection, stale-preview rejection and resumable import journals.
+
 - Add historical submission cohorts with separate current-status, reached-stage and frozen-fit denominators; disclose incomplete history and suppress small-sample percentages.
 
 - Add manual dated follow-ups with preserved completion history and terminal-state suppression; serialize CLI data operations with an explicit local lock.

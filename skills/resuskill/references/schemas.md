@@ -143,3 +143,7 @@ This release retains schema version 1. Existing v1 profiles and jobs remain read
 Optional `tracking.followups` records have stable `fN` IDs, full calendar `date`, `note`, `state` (`active`, `inactive`, `completed`, `cancelled`), `created_at` and `updated_at`. Legacy jobs without them use an empty list. The CLI manages IDs/timestamps. Follow-ups do not change job revision, package approval or submission snapshots. Offer/rejected/withdrawn transitions inactivate active records.
 
 Historical reporting reads existing `tracking.applied_at`, ordered `tracking.history` events and the referenced immutable snapshot's checklist. It adds no stored fields and does not rewrite legacy data. Dates used for cohort filters retain the recorded timestamp's offset.
+
+## Shortlist imports
+
+Each row requires nonempty `company`, `title`, `description`, HTTP(S) `source_url`, and timezone-aware `observed_at`. Optional fields: `location`, both `source_namespace` and `requisition_id`, and `listing` using the observation schema above. Unknown fields are rejected. Previews contain content hashes and row classifications; keep them unchanged. Import journals are internal recovery records under `imports/` and must not be edited to bypass conflicts.
