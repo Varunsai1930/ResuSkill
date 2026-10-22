@@ -4,7 +4,7 @@ Each row records a required invariant and its executable coverage or remaining g
 
 | Risk | Required behavior | Coverage / status |
 |---|---|---|
-| Claim badges and stale sources | Current checks cannot establish semantic truth | test_claim_review; independent audit pending |
+| Claim badges and stale sources | Current checks cannot establish semantic truth | test_claim_review; independent audit completed (see status.md) |
 | Missing versus absent skill | Preserve Unknown, any/all and required/preferred | test_insights, test_checklist |
 | Pipeline state | No repeat-submit suggestions; damaged data visible | test_pipeline |
 | Copied installation | Run actual installed copy outside checkout, paths with spaces | tools/check_copy.py; added to nine CI jobs |
@@ -16,7 +16,7 @@ Each row records a required invariant and its executable coverage or remaining g
 | Git evidence | Exact committed text; no repo execution; role/impact attested separately | test_ledger; 8 focused cases passed, independent recheck completed |
 | Migration | New validated directory, original and snapshots unchanged | test_ledger; 8 focused cases passed, independent recheck completed |
 | Cover letter | Optional artifact participates in current approval and snapshot | test_letters; 8 focused cases passed, independent recheck completed |
-| Stories | Unknown results permitted; changed sources invalidate stories | Milestone G pending |
+| Stories | Unknown results permitted; changed sources invalidate stories | test_stories; 8 focused cases passed, independent review completed |
 | HTML/PDF | Unicode, long inputs, escaping, failed export preserves prior files | Existing render tests; visual inspection pending |
 | Agent meaning and permission | No invented facts, sensitive answers, or unseen-content approval | Both-client human-reviewed suite pending |
 

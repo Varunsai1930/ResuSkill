@@ -500,6 +500,26 @@ def build_parser() -> argparse.ArgumentParser:
             x.add_argument('--pdf', action='store_true')
     p.set_defaults(func=cmd_letter)
 
+    p = sub.add_parser('stories', help='evidence-backed interview preparation')
+    ss = p.add_subparsers(dest='action', required=True)
+    x = ss.add_parser('propose', parents=[common])
+    x.add_argument('--file', required=True)
+    x.add_argument('--id', help='replace the pending draft for an existing story')
+    x = ss.add_parser('accept', parents=[common])
+    x.add_argument('id')
+    x = ss.add_parser('show', parents=[common])
+    x.add_argument('id')
+    x.add_argument('--proposal', action='store_true')
+    x = ss.add_parser('check', parents=[common])
+    x.add_argument('id', nargs='?')
+    ss.add_parser('list', parents=[common])
+    x = ss.add_parser('export', parents=[common])
+    x.add_argument('id')
+    x.add_argument('--output', required=True)
+    x = ss.add_parser('suggest', parents=[common])
+    x.add_argument('job')
+    p.set_defaults(func=cmd_stories)
+
     p = sub.add_parser("pipeline", parents=[common], help="review states, listing freshness, blockers and next actions")
     p.add_argument("--output", help="export HTML and JSON into a new directory")
     p.set_defaults(func=cmd_pipeline)
@@ -646,6 +666,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_stories(args):
+    from . import stories
+    if args.action == 'propose':
+        result = stories.propose(store.load_input(args.file), args.id)
+    elif args.action == 'accept':
+        result = stories.accept(args.id)
+    elif args.action == 'show':
+        result = stories.show(args.id, args.proposal)
+    elif args.action in ('list', 'check'):
+        result = stories.check(getattr(args, 'id', None))
+    elif args.action == 'export':
+        result = stories.export(args.id, args.output)
+    else:
+        result = stories.suggest(args.job)
+    out(result, True)
+    if args.action == 'check':
+        return 1 if any(item['errors'] for item in result) else 0
 
 
 def cmd_letter(args):

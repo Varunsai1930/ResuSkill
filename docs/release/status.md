@@ -19,3 +19,13 @@ Baseline implementation: 0e5c83c. Subsequent milestones require qualification on
 Record exact revision/diff, client/model versions, manifest hash, human reviewer, transcripts, artifacts and scored denominators. Both client suites must pass; review incomplete staged conversations with the actual user, never scripted approval of unseen content. New features extend the versioned suite. Run full CI and copied-install/export checks on the candidate release revision. Publish only after reviewing all results.
 
 Codex captures against committed 99aebc5: e01–e03 failed due to the account usage limit; the runner stopped after three failures. Remaining cases are not run, and no behavioral score is reported.
+
+## Implemented through milestone G
+
+The feature sequence is implemented in separate verified commits: follow-ups, historical outcomes, reviewed imports, explicit copy migration/pinned evidence, cover letters and interview stories. Milestone A qualification infrastructure is implemented; public qualification is incomplete.
+
+Latest local suite: **357 passing tests**, Python 3.14.1. Copied-install smoke passes outside the checkout and now exercises migration, follow-ups, historical insights, letters and stories. Independent reviews completed for each feature; all confirmed findings were fixed and rechecked. Detailed evidence is in `docs/verification/04-beta-qualification.md` through `10-stories.md`.
+
+Current behavioral manifest: `evals/cases-v7.json`, **34 cases per client** (original 25 unchanged). Human-reviewed passes on the final implementation: **0/34 Codex and 0/34 Claude Code**; this indicates missing qualification evidence, not 68 observed behavioral failures. Earlier launch failures/ungraded captures remain recorded above. Nine remote OS/Python jobs and visual short/long/multilingual HTML/PDF review have no completed final-revision evidence. No beta tag, push or publication has occurred.
+
+Current limitations: source checks cannot prove meaning, authorship or business impact; explicit user review remains necessary. Git evidence supports regular UTF-8 committed files up to 2 MB. Job ingestion is reviewed JSON only. Follow-ups are manual calendar records without notification scheduling or messages. Letters use sourced factual paragraphs with fixed nonfactual openings/closings; company research is not included. Story suggestions show skill overlap, not full requirement satisfaction. PDF export requires a supported local browser. Format 2 requires a new-directory migration and fresh package approvals; incomplete imports must be recovered first, and import previews regenerated after migration.

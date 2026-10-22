@@ -73,6 +73,6 @@ In addition to the scored cases, exercise job finding with fictional profiles an
 
 ## Versioned release suites
 
-Keep `cases.json` as the original 25-case baseline. `cases-v2.json` includes it unchanged plus claim-review, insights and pipeline cases (28 total per client).
+Keep `cases.json` as the original 25-case baseline. `cases-v7.json` includes it unchanged plus claim review, insights, pipeline, follow-ups, historical reporting, imports, project evidence, letters and stories (34 total per client). Earlier versioned manifests remain available.
 
-Prepare with `python3 evals/run.py prepare --output NEW_DIR --manifest evals/cases-v2.json`. Expectations and the manifest copy remain in the reviewer directory, outside the agent workspace. Results record the manifest SHA-256. Score with `python3 evals/score.py RESULTS --manifest evals/cases-v2.json`; missing cases or a mismatched manifest fail. Preparation and synthetic scoring tests are never behavioral passes. Human review and complete staged interactions remain mandatory.
+Prepare with `python3 evals/run.py prepare --output NEW_DIR --manifest evals/cases-v7.json`. Expectations and the manifest copy remain in the reviewer directory, outside the agent workspace. Results record the manifest SHA-256. Score with `python3 evals/score.py RESULTS --manifest evals/cases-v7.json`; missing cases or a mismatched manifest fail. Preparation and synthetic scoring tests are never behavioral passes. Human review and complete staged interactions remain mandatory.

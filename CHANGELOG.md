@@ -69,3 +69,5 @@ Known limits: deterministic lexical checks cannot establish semantic truth, catc
 - Added explicit copy migration to data format 2 and pinned local Git evidence with separate candidate contribution/outcome attestations, confirmation, refresh and retirement.
 
 - Added optional sourced cover letters with separate pending/accepted content, approval freshness, frozen submission evidence, staged HTML/PDF exports and source review. Snapshot writes now stage before publication.
+
+- Added sourced interview stories with explicit unknown results and contribution scope, separate drafts/accepted stories, freshness checks, pinned-code questions, job-specific skill overlap and staged HTML/JSON exports.

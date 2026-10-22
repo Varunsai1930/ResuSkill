@@ -31,7 +31,32 @@ def main():
         assert Path(demo['resume']).is_file()
         assert json.loads(run('insights', '--json'))['recorded_jobs'] == 1
         assert len(json.loads(run('pipeline', '--json'))['jobs']) == 1
-        print('PASS: copied skill CLI, fictional demo, HTML, insights and pipeline outside checkout')
+        migrated = json.loads(run('migrate', '--output', str(base / 'migrated data')))
+        env['RESUSKILL_HOME'] = migrated['data_dir']
+        prof = json.loads(run('profile', 'show', '--json'))
+        job = json.loads(run('jobs', '--json'))[0]['id']
+        run('followup', 'set', job, '--date', '2028-02-29', '--note', 'Manual test')
+        assert len(json.loads(run('followup', 'list', job, '--json'))) == 1
+        run('insights', '--historical', '--json')
+        def write(name, data):
+            path = base / name
+            path.write_text(json.dumps(data), encoding='utf-8')
+            return str(path)
+        part = {'text': prof['summary'], 'sources': ['summary']}
+        letter = write('letter.json', {'paragraphs': [part]})
+        run('letter', 'propose', job, '--file', letter)
+        run('letter', 'accept', job)
+        run('letter', 'render', job, '--output', str(base / 'letter export'))
+        story = write('story.json', {'situation': part, 'task': part, 'action': part,
+                                    'result': None, 'contribution_scope': 'personal'})
+        ident = json.loads(run('stories', 'propose', '--file', story))['id']
+        run('stories', 'accept', ident)
+        run('stories', 'check', ident)
+        run('stories', 'suggest', job)
+        run('stories', 'export', ident, '--output', str(base / 'story export'))
+        assert (base / 'story export/story.html').is_file()
+        assert (base / 'letter export/letter.html').is_file()
+        print('PASS: copied CLI, demo, reports, migration, follow-ups, history, letters and stories outside checkout')
 
 
 if __name__ == '__main__':

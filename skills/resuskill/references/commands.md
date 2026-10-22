@@ -146,3 +146,7 @@ Apply validates all selected rows before writing. A journal records the complete
 `letter propose JOB --file FILE`, `letter show JOB [--proposal]`, `letter accept JOB`, `letter remove JOB [--proposal]`, `letter render JOB --output NEW_DIR [--pdf]`.
 
 Drafts remain separate. Show every paragraph and its sources before the user accepts it. An accepted letter participates in package approval and submitted snapshots; editing or removing it makes prior approval stale. Export validates current evidence and stages all files in a new directory, preserving existing exports on failure. HTML source review accompanies the letter. PDF needs an available supported browser. Resume-only packages still work without a letter.
+
+### Interview stories (format 2)
+
+`stories propose --file FILE [--id ID]`, `stories accept ID`, `stories list`, `stories show ID [--proposal]`, `stories check [ID]`, `stories export ID --output NEW_DIR`, and `stories suggest JOB` emit JSON. Exports also create escaped HTML with source review. Replacement proposals preserve accepted content. Checks disclose stale references; only current accepted stories are exported or suggested. Suggestions show skill overlap with reviewed requirements, not a claim that every requirement is met. Implementation questions cite confirmed committed excerpts. Interview preparation does not modify application approval; source text reused in an application goes through that artifact's normal review.
