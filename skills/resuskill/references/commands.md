@@ -134,3 +134,9 @@ CLI operations on the candidate directory take an exclusive `.command-lock`. A c
 Input is a nonempty list with `company`, `title`, `description`, `source_url`, timezone-aware `observed_at`, optional `location`, paired `source_namespace`/`requisition_id`, and optional reviewed `listing` object. No fetching occurs. Observation time alone does not establish that a listing is open. Identity uses the requisition pair or canonical URL (host/default port/fragment normalized; query/path preserved). Same-title jobs are only possible duplicates.
 
 Apply validates all selected rows before writing. A journal records the complete intended state and supports retries after interruption; retry the same command and preview. Any unexpected record change blocks resume. Updating descriptions clears obsolete requirement review/evidence and increments job revision; package files, tracking and snapshots remain intact, with old approval becoming stale. CLI locking prevents competing imports. Keep previews/journals until an interrupted import is resolved.
+
+### Pinned project evidence (data format 2)
+
+`migrate --output NEW_DIR` copies and validates the current data into a new directory; set `RESUSKILL_HOME` to that directory explicitly. Original data and historical snapshots remain unchanged. Prior package approvals are cleared. Finish incomplete imports first; regenerate import previews after migration. Do not point an older client at the migrated directory.
+
+`project-evidence propose --file FILE`, `confirm ID`, `check [ID]`, `list`, and `retire ID` emit JSON. Propose inspects committed regular UTF-8 files through Git without running code. Confirm only after the user reviews the excerpt, their contribution and their claimed outcome. Check reports temporary repository unavailability separately from invalid citations. Retired records remain readable. Changed citations/links require a new proposal and review.

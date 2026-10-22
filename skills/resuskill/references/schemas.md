@@ -147,3 +147,7 @@ Historical reporting reads existing `tracking.applied_at`, ordered `tracking.his
 ## Shortlist imports
 
 Each row requires nonempty `company`, `title`, `description`, HTTP(S) `source_url`, and timezone-aware `observed_at`. Optional fields: `location`, both `source_namespace` and `requisition_id`, and `listing` using the observation schema above. Unknown fields are rejected. Previews contain content hashes and row classifications; keep them unchanged. Import journals are internal recovery records under `imports/` and must not be edited to bypass conflicts.
+
+### Project evidence
+
+Format 2 is opt-in through copy migration. A `format.json` directory marker and schema 2 current profile/job/package records prevent silent reuse by old clients; frozen historical records retain their original format. Evidence proposals contain `repository` (local path), `commit` (full 40/64 digit Git ID), `path` (relative regular UTF-8 file), `start_line`/`end_line` (inclusive), exact `excerpt` (LF joined, no terminal newline), `observed_fact`, `project_id`, `bullet_id`, `contribution`, and optional `outcome` (empty means unknown). The ledger assigns stable peN IDs, confirmation state, excerpt/blob hashes, content/link fingerprints and verification timestamps. Git proves the cited text exists; authorship, leadership and outcomes require user attestation. Symlinks, submodules, binary files and files over 2 MB are unsupported.

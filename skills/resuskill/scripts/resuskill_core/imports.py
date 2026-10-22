@@ -119,7 +119,7 @@ def _job(clean, jid, old=None, at=None):
     result.update({k: clean[k] for k in ('company', 'title', 'description', 'location')})
     result.update(url=clean['source_url'], listing=clean['listing'],
                   import_source={'identity': identity(clean), 'observed_at': clean['observed_at']},
-                  schema_version=SCHEMA_VERSION, revision=result['revision'] + 1, updated_at=now)
+                  schema_version=store.data_version(), revision=result['revision'] + 1, updated_at=now)
     jobs._check_stored(result, jid)
     return result
 

@@ -471,6 +471,21 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument('--update', action='append', default=[], metavar='ROW=JOB')
     x.set_defaults(func=cmd_import)
 
+    p = sub.add_parser('migrate', parents=[common], help='copy data into a new version-2 directory')
+    p.add_argument('--output', required=True)
+    p.set_defaults(func=cmd_migrate)
+    p = sub.add_parser('project-evidence', help='pinned local Git evidence and user attestations')
+    es = p.add_subparsers(dest='action', required=True)
+    x = es.add_parser('propose', parents=[common])
+    x.add_argument('--file', required=True)
+    for action in ('confirm', 'retire'):
+        x = es.add_parser(action, parents=[common])
+        x.add_argument('id')
+    x = es.add_parser('check', parents=[common])
+    x.add_argument('id', nargs='?')
+    es.add_parser('list', parents=[common])
+    p.set_defaults(func=cmd_project_evidence)
+
     p = sub.add_parser("pipeline", parents=[common], help="review states, listing freshness, blockers and next actions")
     p.add_argument("--output", help="export HTML and JSON into a new directory")
     p.set_defaults(func=cmd_pipeline)
@@ -617,6 +632,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_migrate(args):
+    from . import migration
+    result = migration.migrate(args.output)
+    out(result, True)
+
+
+def cmd_project_evidence(args):
+    from . import ledger
+    if args.action == 'propose':
+        result = ledger.propose(store.load_input(args.file))
+    elif args.action in ('confirm', 'retire'):
+        result = ledger.action(args.id, args.action)
+    elif args.action == 'check':
+        result = ledger.check(args.id)
+    else:
+        result = ledger.load()['records']
+    out(result, True)
+    if args.action == 'check':
+        return 1 if any(r['state'] != 'verified' for r in result) else 0
 
 
 def cmd_import(args):

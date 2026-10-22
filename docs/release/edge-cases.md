@@ -13,8 +13,8 @@ Each row records a required invariant and its executable coverage or remaining g
 | Follow-up lifecycle | Dates are explicit; terminal/reopened jobs cannot reactivate silently | test_followups; 6 focused cases passed, independent review completed |
 | Historical reporting | Fixed submission evidence, honest denominators, chronology validation | test_history; 6 focused tests passed, independent recheck completed |
 | Imports | Bound preview, explicit updates, idempotent resume after interruption | test_imports; 10 focused cases passed, independent recheck completed |
-| Git evidence | Exact committed text; no repo execution; role/impact attested separately | Milestone E pending |
-| Migration | New validated directory, original and snapshots unchanged | Milestone E pending |
+| Git evidence | Exact committed text; no repo execution; role/impact attested separately | test_ledger; 8 focused cases passed, independent recheck completed |
+| Migration | New validated directory, original and snapshots unchanged | test_ledger; 8 focused cases passed, independent recheck completed |
 | Cover letter | Optional artifact participates in current approval and snapshot | Milestone F pending |
 | Stories | Unknown results permitted; changed sources invalidate stories | Milestone G pending |
 | HTML/PDF | Unicode, long inputs, escaping, failed export preserves prior files | Existing render tests; visual inspection pending |

@@ -14,7 +14,7 @@ from . import listing
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
-VALIDATION_VERSION = 5
+VALIDATION_VERSION = 6
 
 
 def _path(job_id: str):
@@ -71,7 +71,7 @@ def _check_stored(pkg: dict) -> None:
 
 
 def save(job_id: str, pkg: dict, content_changed: bool = True) -> None:
-    pkg["schema_version"] = SCHEMA_VERSION
+    pkg["schema_version"] = store.data_version()
     if content_changed:
         pkg["approval"] = None
     pkg["updated_at"] = now_iso()

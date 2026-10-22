@@ -110,7 +110,7 @@ def _check_auxiliary(job: dict) -> None:
 
 
 def save(job: dict) -> None:
-    job["schema_version"] = SCHEMA_VERSION
+    job["schema_version"] = store.data_version()
     job["updated_at"] = now_iso()
     store.write_json(store.job_dir(job["id"]) / "job.json", job)
 

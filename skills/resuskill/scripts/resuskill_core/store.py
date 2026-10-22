@@ -13,13 +13,22 @@ from .util import ResuError
 _UNSET = object()
 
 
+def data_version() -> int:
+    marker = read_json(home() / 'format.json')
+    if marker is None:
+        return 1
+    if not isinstance(marker, dict) or type(marker.get('version')) is not int or marker['version'] != 2:
+        raise ResuError('Unsupported data-directory format; restore a compatible backup.')
+    return marker['version']
+
+
 def check_version(data, name: str, version=_UNSET) -> None:
-    from . import SCHEMA_VERSION
+    expected = data_version()
 
     if not isinstance(data, dict):
         raise ResuError(f"Stored {name} must be a JSON object; restore a valid backup")
-    value = data.get("schema_version", SCHEMA_VERSION) if version is _UNSET else version
-    if type(value) is not int or value != SCHEMA_VERSION:
+    value = data.get("schema_version", expected) if version is _UNSET else version
+    if type(value) is not int or value != expected:
         raise ResuError(f"Unsupported {name} schema version {value!r}. Update ResuSkill or restore a compatible backup; data was not changed.")
 
 

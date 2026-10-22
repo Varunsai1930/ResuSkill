@@ -65,3 +65,5 @@
 Compatibility: schema stays at v1. Existing profile/job data is retained. Existing approvals (including those made before the credential changes) and legacy evidence/overrides may need renewed review. A job folder whose `job.json` id differs from the folder name is refused. Strict validation can reject previously accepted malformed input. Unknown prompt wording now requires user input. `evidence link` replaces its set of sources, and `package check` returns nonzero for blockers.
 
 Known limits: deterministic lexical checks cannot establish semantic truth, catch every technology or prevent an agent from bypassing the workflow. Agent behavior in both clients must be evaluated separately. No zero-hallucination guarantee is made.
+
+- Added explicit copy migration to data format 2 and pinned local Git evidence with separate candidate contribution/outcome attestations, confirmation, refresh and retirement.

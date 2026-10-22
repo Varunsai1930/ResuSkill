@@ -376,7 +376,7 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
         raise ResuError("Profile is invalid; nothing was saved.", errors)
 
     prof["_meta"] = {
-        "schema": SCHEMA_VERSION,
+        "schema": store.data_version(),
         "revision": int(current.get("_meta", {}).get("revision", 0)),
         "updated_at": current.get("_meta", {}).get("updated_at"),
         "id_counters": counters,
