@@ -67,3 +67,5 @@ Compatibility: schema stays at v1. Existing profile/job data is retained. Existi
 Known limits: deterministic lexical checks cannot establish semantic truth, catch every technology or prevent an agent from bypassing the workflow. Agent behavior in both clients must be evaluated separately. No zero-hallucination guarantee is made.
 
 - Added explicit copy migration to data format 2 and pinned local Git evidence with separate candidate contribution/outcome attestations, confirmation, refresh and retirement.
+
+- Added optional sourced cover letters with separate pending/accepted content, approval freshness, frozen submission evidence, staged HTML/PDF exports and source review. Snapshot writes now stage before publication.

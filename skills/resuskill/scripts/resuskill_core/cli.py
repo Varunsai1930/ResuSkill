@@ -486,6 +486,20 @@ def build_parser() -> argparse.ArgumentParser:
     es.add_parser('list', parents=[common])
     p.set_defaults(func=cmd_project_evidence)
 
+    p = sub.add_parser('letter', help='review optional cover letters')
+    ls = p.add_subparsers(dest='action', required=True)
+    for action in ('propose', 'show', 'accept', 'remove', 'render'):
+        x = ls.add_parser(action, parents=[common])
+        x.add_argument('job')
+        if action == 'propose':
+            x.add_argument('--file', required=True)
+        if action in ('show', 'remove'):
+            x.add_argument('--proposal', action='store_true')
+        if action == 'render':
+            x.add_argument('--output', required=True)
+            x.add_argument('--pdf', action='store_true')
+    p.set_defaults(func=cmd_letter)
+
     p = sub.add_parser("pipeline", parents=[common], help="review states, listing freshness, blockers and next actions")
     p.add_argument("--output", help="export HTML and JSON into a new directory")
     p.set_defaults(func=cmd_pipeline)
@@ -632,6 +646,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", metavar="FILE", help="also check text extracted from this exported PDF")
     p.set_defaults(func=cmd_ats)
     return parser
+
+
+def cmd_letter(args):
+    from . import letters, ledger
+    ledger.require_v2()
+    if args.action == 'propose':
+        result = letters.propose(args.job, store.load_input(args.file))
+    elif args.action == 'accept':
+        result = letters.accept(args.job)
+    elif args.action == 'remove':
+        letters.remove(args.job, args.proposal)
+        result = {'removed': 'proposal' if args.proposal else 'accepted'}
+    elif args.action == 'render':
+        result = letters.export(args.job, args.output, args.pdf)
+    else:
+        result = package_mod.load(args.job).get('letter_proposal' if args.proposal else 'letter')
+    out(result, True)
 
 
 def cmd_migrate(args):

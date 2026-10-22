@@ -140,3 +140,9 @@ Apply validates all selected rows before writing. A journal records the complete
 `migrate --output NEW_DIR` copies and validates the current data into a new directory; set `RESUSKILL_HOME` to that directory explicitly. Original data and historical snapshots remain unchanged. Prior package approvals are cleared. Finish incomplete imports first; regenerate import previews after migration. Do not point an older client at the migrated directory.
 
 `project-evidence propose --file FILE`, `confirm ID`, `check [ID]`, `list`, and `retire ID` emit JSON. Propose inspects committed regular UTF-8 files through Git without running code. Confirm only after the user reviews the excerpt, their contribution and their claimed outcome. Check reports temporary repository unavailability separately from invalid citations. Retired records remain readable. Changed citations/links require a new proposal and review.
+
+### Cover letters (format 2)
+
+`letter propose JOB --file FILE`, `letter show JOB [--proposal]`, `letter accept JOB`, `letter remove JOB [--proposal]`, `letter render JOB --output NEW_DIR [--pdf]`.
+
+Drafts remain separate. Show every paragraph and its sources before the user accepts it. An accepted letter participates in package approval and submitted snapshots; editing or removing it makes prior approval stale. Export validates current evidence and stages all files in a new directory, preserving existing exports on failure. HTML source review accompanies the letter. PDF needs an available supported browser. Resume-only packages still work without a letter.

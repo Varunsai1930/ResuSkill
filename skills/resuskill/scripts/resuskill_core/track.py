@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
+from pathlib import Path
 
 from . import checklist as checklist_mod
 from . import jobs as jobs_mod
@@ -51,30 +53,45 @@ def snapshot(job_id: str) -> str:
         raise ResuError("Approved package no longer passes validation; review it again.", blockers)
     outputs = render.render(job_id)
     name = stamp()
-    folder = store.job_dir(job_id) / "snapshots" / name
-    folder.mkdir(parents=True)
-    # Freeze the PDF only if it was printed from the approved resume and current profile.
-    pdf = render.out_dir(job_id) / render.pdf_name(prof)
-    settings = style.saved(render.out_dir(job_id))
-    pdf_current = pdf.exists() and store.read_json(render.stamp_path(pdf)) == render.pdf_stamp(prof, pkg["resume"], settings)
-    store.write_json(folder / "package.json", {
-        "job": {k: job[k] for k in ("id", "company", "title", "location", "url", "revision")},
-        "approval": pkg["approval"],
-        "package": package_mod.resolved(job, prof, pkg),
-        "checklist": checklist_mod.evaluate(job, prof),
-        "profile": prof,
-        "pdf": pdf.name if pdf_current else None,
-        "pdf_note": None if pdf_current else (
-            "The existing PDF was printed from different content and was not frozen." if pdf.exists() else "No PDF was rendered."
-        ),
-        "frozen_at": now_iso(),
-        "render_style": settings,
-        "listing": listing.assess(job),
-    })
-    shutil.copy2(outputs["resume"], folder / "resume.html")
-    shutil.copy2(outputs["review"], folder / "review.html")
-    if pdf_current:
-        shutil.copy2(pdf, folder / pdf.name)
+    parent = store.job_dir(job_id) / 'snapshots'
+    parent.mkdir(exist_ok=True)
+    target = parent / name
+    folder = Path(tempfile.mkdtemp(prefix='.snapshot-', dir=parent))
+    try:
+        # Freeze the PDF only if it was printed from the approved resume and current profile.
+        pdf = render.out_dir(job_id) / render.pdf_name(prof)
+        settings = style.saved(render.out_dir(job_id))
+        pdf_current = pdf.exists() and store.read_json(render.stamp_path(pdf)) == render.pdf_stamp(prof, pkg["resume"], settings)
+        store.write_json(folder / "package.json", {
+            "job": {k: job[k] for k in ("id", "company", "title", "location", "url", "revision")},
+            "approval": pkg["approval"],
+            "package": package_mod.resolved(job, prof, pkg),
+            "checklist": checklist_mod.evaluate(job, prof),
+            "profile": prof,
+            "pdf": pdf.name if pdf_current else None,
+            "pdf_note": None if pdf_current else (
+                "The existing PDF was printed from different content and was not frozen." if pdf.exists() else "No PDF was rendered."
+            ),
+            "frozen_at": now_iso(),
+            "render_style": settings,
+            "listing": listing.assess(job),
+        })
+        shutil.copy2(outputs["resume"], folder / "resume.html")
+        shutil.copy2(outputs["review"], folder / "review.html")
+        if pdf_current:
+            shutil.copy2(pdf, folder / pdf.name)
+        if pkg.get('letter') is not None:
+            from . import letters
+            (folder / 'letter.html').write_text(letters.html(pkg['letter'], job, prof), encoding='utf-8')
+            (folder / 'letter-sources.html').write_text(letters.html(pkg['letter'], job, prof, True), encoding='utf-8')
+        if package_mod.review_state(jobs_mod.load(job_id), package_mod.load(job_id), profile_mod.load()) != package_mod.APPROVED:
+            raise ResuError('Package changed while preparing the snapshot; review again.')
+        if target.exists():
+            raise ResuError('Snapshot destination already exists; retry without replacing history.')
+        folder.rename(target)
+    finally:
+        if folder.exists():
+            shutil.rmtree(folder)
     return name
 
 

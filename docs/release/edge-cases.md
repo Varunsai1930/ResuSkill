@@ -15,7 +15,7 @@ Each row records a required invariant and its executable coverage or remaining g
 | Imports | Bound preview, explicit updates, idempotent resume after interruption | test_imports; 10 focused cases passed, independent recheck completed |
 | Git evidence | Exact committed text; no repo execution; role/impact attested separately | test_ledger; 8 focused cases passed, independent recheck completed |
 | Migration | New validated directory, original and snapshots unchanged | test_ledger; 8 focused cases passed, independent recheck completed |
-| Cover letter | Optional artifact participates in current approval and snapshot | Milestone F pending |
+| Cover letter | Optional artifact participates in current approval and snapshot | test_letters; 8 focused cases passed, independent recheck completed |
 | Stories | Unknown results permitted; changed sources invalidate stories | Milestone G pending |
 | HTML/PDF | Unicode, long inputs, escaping, failed export preserves prior files | Existing render tests; visual inspection pending |
 | Agent meaning and permission | No invented facts, sensitive answers, or unseen-content approval | Both-client human-reviewed suite pending |

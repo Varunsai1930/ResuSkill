@@ -14,7 +14,7 @@ from . import listing
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
-VALIDATION_VERSION = 6
+VALIDATION_VERSION = 7
 
 
 def _path(job_id: str):
@@ -58,6 +58,10 @@ def _check_stored(pkg: dict) -> None:
             for flag in ("skipped", "confirmed"):
                 if flag in record and type(record[flag]) is not bool:
                     problems.append(f"{where}.{flag}")
+    for name in ("letter", "letter_proposal"):
+        if pkg.get(name) is not None:
+            from . import letters
+            letters.shape(pkg[name])
     approval = pkg["approval"]
     if approval is not None:
         if not isinstance(approval, dict):
@@ -438,7 +442,12 @@ def resolved(job: dict, prof: dict, pkg: dict) -> dict:
     for question in job.get("questions") or []:
         result = resolve_answer(question, pkg["answers"].get(question["id"]), pkg["answer_proposals"].get(question["id"]), prof)
         answers.append({"id": question["id"], "question": question["text"], "required": question["required"], "category": question["category"], **result})
-    return {"resume": pkg.get("resume"), "answers": answers}
+    result = {"resume": pkg.get("resume"), "answers": answers}
+    if pkg.get('letter') is not None:
+        from . import letters
+        result['letter'] = pkg['letter']
+        result['letter_errors'] = letters.check(pkg['letter'], job, prof)
+    return result
 
 
 def check(job_id: str) -> tuple[list[str], list[str]]:
@@ -456,6 +465,11 @@ def check(job_id: str) -> tuple[list[str], list[str]]:
             warnings.extend(resume_warnings)
         except ResuError as exc:
             blockers.append("Accepted resume no longer validates against the profile: " + "; ".join(exc.details[:5]))
+    if pkg.get('letter') is not None:
+        from . import letters
+        blockers.extend('Accepted letter: ' + error for error in letters.check(pkg['letter'], job, prof))
+    if pkg.get('letter_proposal') is not None:
+        warnings.append('A pending letter has not been accepted')
     for item in resolved(job, prof, pkg)["answers"]:
         question = _question(job, item["id"])
         answer = pkg["answers"].get(item["id"])

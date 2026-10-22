@@ -318,6 +318,8 @@ def review_html(job: dict, prof: dict, pkg: dict, proposal: dict | None) -> str:
             f"<td><span class='pill {'met' if a['resolved'] else 'unknown'}'>{_e(a['label'])}</span><br>"
             f"{content}{draft}</td></tr>")
     answer_rows = "".join(answer_rows) or "<tr><td colspan=3 class='meta'>No questions added.</td></tr>"
+    from . import letters
+    letter_review = letters.review_section(pkg, job, prof)
     pending = proposal["proposal"] if proposal else None
     observation = listing.assess(job)
     listing_notes = ''.join(f'<li>{_e(w)}</li>' for w in observation['warnings'])
@@ -339,6 +341,7 @@ profile r{prof['_meta']['revision']} · job r{job['revision']}</p>
 Rule checks run again for this review; they do not approve content or clear a stale approval.</p>
 {_bullet_pairs(job, prof, pkg.get('resume'), 'Accepted resume')}
 {_bullet_pairs(job, prof, pending, 'Latest proposal (not accepted)') if pending and pending != pkg.get('resume') else ''}
+{letter_review}
 <h2>Answers</h2>
 <div class="card"><table><tr><th>ID</th><th>Question</th><th>Answer</th></tr>{answer_rows}</table></div>
 <p class="meta">Automated checks catch invented numbers, technologies and credentials. They cannot judge meaning: read every proposed line against its original.</p>
