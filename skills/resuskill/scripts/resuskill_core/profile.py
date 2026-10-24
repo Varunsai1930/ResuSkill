@@ -413,6 +413,7 @@ def diff(old: dict | None, new: dict) -> list[str]:
     for section in ENTRY_SECTIONS:
         old_entries = {e["id"]: e for e in old.get(section) or []}
         new_entries = {e["id"]: e for e in new.get(section) or []}
+        compare(f"{section}.order", list(old_entries), list(new_entries))
         for entry_id, entry in new_entries.items():
             label = entry.get("organization") or entry.get("institution") or entry.get("name")
             before = old_entries.get(entry_id)
@@ -427,6 +428,7 @@ def diff(old: dict | None, new: dict) -> list[str]:
                 compare(f"{section}.{entry_id}.{field}", before.get(field), entry.get(field))
             old_b = {b["id"]: b["text"] for b in before.get("bullets") or []}
             new_b = {b["id"]: b["text"] for b in entry["bullets"]}
+            compare(f"{section}.{entry_id}.bullets.order", list(old_b), list(new_b))
             for bid, text in new_b.items():
                 if bid not in old_b:
                     lines.append(f"+ {bid}: {text}")
@@ -441,6 +443,7 @@ def diff(old: dict | None, new: dict) -> list[str]:
 
     old_skills = {canon(s["name"]): s for s in old.get("skills") or []}
     new_skills = {canon(s["name"]): s for s in new["skills"]}
+    compare("skills.order", list(old_skills), list(new_skills))
     for key in new_skills.keys() - old_skills.keys():
         lines.append(f"+ skill: {new_skills[key]['name']}")
     for key in old_skills.keys() - new_skills.keys():
@@ -448,10 +451,11 @@ def diff(old: dict | None, new: dict) -> list[str]:
     for key in sorted(new_skills.keys() & old_skills.keys()):
         for field in ("name", "category"):
             compare(f"skill {new_skills[key]['name']}.{field}", old_skills[key].get(field), new_skills[key].get(field))
-    compare("skills_absent", sorted(old.get("skills_absent") or []), sorted(new["skills_absent"]))
+    compare("skills_absent", old.get("skills_absent") or [], new["skills_absent"])
 
     old_certs = {c.get("id"): c for c in old.get("certifications") or []}
     new_certs = {c.get("id"): c for c in new["certifications"]}
+    compare("certifications.order", list(old_certs), list(new_certs))
     for cert_id, cert in new_certs.items():
         before = old_certs.get(cert_id)
         if before is None:

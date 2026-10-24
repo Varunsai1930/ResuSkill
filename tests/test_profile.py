@@ -54,6 +54,33 @@ class ProfileTests(IsolatedHome):
         self.assertEqual(changes, [])
         self.assertEqual(again["_meta"]["revision"], 1)
 
+    def test_reordering_is_disclosed_in_diff_and_saved_changes(self):
+        data = fixture('profile.json')
+        for section in ('education', 'experience', 'projects'):
+            other = copy.deepcopy(data[section][0])
+            key = {'education': 'institution', 'experience': 'organization', 'projects': 'name'}[section]
+            other[key] = 'Another example'
+            data[section].append(other)
+        data['certifications'] = [{'name': 'CPA'}, {'name': 'PMP'}]
+        data['skills_absent'] = ['Rust', 'Kafka']
+        profile.save(data)
+        for section in ('education', 'experience', 'projects', 'skills', 'certifications', 'skills_absent'):
+            before = profile.load()
+            edited = copy.deepcopy(before)
+            edited[section].reverse()
+            with self.subTest(section=section):
+                self.assertTrue(profile.diff(before, edited))
+                saved, changes, _ = profile.save(edited)
+                self.assertTrue(changes)
+                self.assertEqual(saved[section], edited[section])
+                self.assertEqual(saved['_meta']['revision'], before['_meta']['revision'] + 1)
+        before = profile.load()
+        edited = copy.deepcopy(before)
+        edited['experience'][0]['bullets'].reverse()
+        self.assertTrue(profile.diff(before, edited))
+        _, changes, _ = profile.save(edited)
+        self.assertTrue(changes)
+
     def test_previous_revision_is_archived(self):
         from resuskill_core import store
 
