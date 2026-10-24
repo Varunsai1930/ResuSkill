@@ -18,6 +18,35 @@ def digest(folder):
 
 
 class QuestionTests(IsolatedHome):
+    def test_ambiguous_education_needs_user_major_and_gpa_answers(self):
+        job = self.seed()
+        prof = profile.load()
+        prof['education'] = [
+            {'institution': 'Old', 'degree': 'BS', 'field': 'Economics', 'gpa': '3.9', 'end': '2020'},
+            {'institution': 'Current', 'degree': 'MS', 'field': 'Computer Science', 'gpa': '3.2', 'start': '2026'},
+        ]
+        saved, _, _ = profile.save(prof)
+        package.propose_resume(job, {'education': [e['id'] for e in saved['education']]})
+        package.accept_resume(job)
+        for text, value in [('Major', 'Computer Science'), ('GPA', '3.2')]:
+            question = package.add_question(job, text, True, None, 'chars', None)
+            answer = package.resolve_answer(question, None, None, saved)
+            self.assertFalse(answer['resolved'])
+            self.assertEqual(answer['text'], '')
+            self.assertTrue(any(question['id'] in b for b in package.check(job)[0]))
+            package.set_answer(job, question['id'], value)
+        self.assertEqual(package.check(job)[0], [])
+
+    def test_single_undated_degree_can_supply_known_values(self):
+        prof = {'education': [{'field': 'Computer Science', 'gpa': '3.2'}]}
+        self.assertEqual(questions.factual_value('major', 'Major', prof), 'Computer Science')
+        self.assertEqual(questions.factual_value('gpa', 'GPA', prof), '3.2')
+
+    def test_tied_degrees_do_not_choose_a_major_arbitrarily(self):
+        prof = {'education': [{'field': 'Economics', 'end': '2020'},
+                              {'field': 'Computer Science', 'end': '2020'}]}
+        self.assertIsNone(questions.factual_value('major', 'Major', prof))
+
     def test_classification(self):
         cases = {
             "Are you legally authorized to work in the United States?": ("sensitive_factual", "authorization"),

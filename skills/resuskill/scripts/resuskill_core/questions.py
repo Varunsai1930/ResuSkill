@@ -149,7 +149,14 @@ def factual_value(key: str, question: str, prof: dict) -> str | None:
     if key == "start_date":
         return (prof.get("availability") or {}).get("start_date") or None
     if key in ("major", "gpa"):
-        education = sorted(prof.get("education") or [], key=lambda e: e.get("graduation") or e.get("end") or "", reverse=True)
+        education = prof.get("education") or []
+        if len(education) > 1:
+            # An undated/current degree must not inherit an older degree's facts.
+            # Tied dates are ambiguous too; let the user choose the applicable one.
+            latest_date = profile_mod.graduation_date(prof)
+            education = [e for e in education if latest_date and (e.get("graduation") or e.get("end")) == latest_date]
+            if len(education) != 1:
+                return None
         latest = education[0] if education else {}
         return latest.get("field" if key == "major" else "gpa") or None
     if key == "authorization":
