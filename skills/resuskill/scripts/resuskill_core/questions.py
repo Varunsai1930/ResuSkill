@@ -6,7 +6,7 @@ import re
 
 from . import profile as profile_mod
 from . import store
-from .util import ResuError, norm_text, now_iso
+from .util import ResuError, date_span, norm_text, now_iso
 
 FACTUAL, SENSITIVE_FACTUAL, SENSITIVE, OPEN, UNKNOWN = "factual", "sensitive_factual", "sensitive", "open", "unknown"
 CATEGORIES = (FACTUAL, SENSITIVE_FACTUAL, SENSITIVE, OPEN, UNKNOWN)
@@ -157,6 +157,13 @@ def factual_value(key: str, question: str, prof: dict) -> str | None:
             education = [e for e in education if latest_date and (e.get("graduation") or e.get("end")) == latest_date]
             if len(education) != 1:
                 return None
+            latest_span = date_span(latest_date)
+            for other in prof['education']:
+                if other is education[0]:
+                    continue
+                other_span = date_span(other.get('graduation') or other.get('end'))
+                if not latest_span or not other_span or other_span[1] >= latest_span[0]:
+                    return None
         latest = education[0] if education else {}
         return latest.get("field" if key == "major" else "gpa") or None
     if key == "authorization":

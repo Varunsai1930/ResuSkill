@@ -554,4 +554,10 @@ def graduation_date(prof: dict) -> str | None:
     # degree's date when the current expected graduation is unknown.
     if any(not d or d == "present" for d in dates):
         return None
-    return max(dates) if dates else None
+    spans = [(d, date_span(d)) for d in dates]
+    if not spans or any(span is None for _, span in spans):
+        return None
+    # The latest possible graduation controls the range. On tied upper bounds,
+    # retain the wider period rather than silently choosing a precise date.
+    latest = max(span[1] for _, span in spans)
+    return min(((d, span) for d, span in spans if span[1] == latest), key=lambda item: item[1][0])[0]

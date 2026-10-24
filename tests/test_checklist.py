@@ -93,6 +93,16 @@ class ChecklistTests(IsolatedHome):
                                              'criterion': {'type': 'location', 'locations': [wanted]}}])
                 self.assertEqual(checklist.evaluate(jobs.load(job), saved)[0]['status'], expected)
 
+    def test_mixed_precision_graduation_retains_the_uncertain_year(self):
+        for dates in [('2026', '2026-01'), ('2026-01', '2026'), ('2026-12', '2026')]:
+            with self.subTest(dates=dates):
+                prof = {'education': [{'end': end} for end in dates]}
+                self.assertEqual(profile.graduation_date(prof), '2026')
+                self.assertEqual(checklist._graduation({'to': '2026-06'}, prof)[0], 'unknown')
+                self.assertEqual(checklist._graduation({'from': '2026', 'to': '2026'}, prof)[0], 'met')
+        prof = {'education': [{'end': '2025'}, {'end': '2026-01'}]}
+        self.assertEqual(profile.graduation_date(prof), '2026-01')
+
     def test_missing_information_stays_unknown(self):
         data = fixture("profile.json")
         data["authorization"] = []

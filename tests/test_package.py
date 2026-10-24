@@ -47,6 +47,13 @@ class QuestionTests(IsolatedHome):
                               {'field': 'Computer Science', 'end': '2020'}]}
         self.assertIsNone(questions.factual_value('major', 'Major', prof))
 
+    def test_overlapping_graduation_ranges_do_not_choose_a_major(self):
+        for dates in [('2026', '2026-01'), ('2026-01', '2026'), ('2026', '2026-01-01')]:
+            prof = {'education': [{'field': 'Economics', 'end': dates[0]},
+                                  {'field': 'Computer Science', 'end': dates[1]}]}
+            with self.subTest(dates=dates):
+                self.assertIsNone(questions.factual_value('major', 'Major', prof))
+
     def test_classification(self):
         cases = {
             "Are you legally authorized to work in the United States?": ("sensitive_factual", "authorization"),
