@@ -1,4 +1,5 @@
 import copy
+from unittest.mock import patch
 
 from helpers import IsolatedHome, fixture
 
@@ -36,6 +37,21 @@ class RequirementTests(IsolatedHome):
 class ChecklistTests(IsolatedHome):
     def evaluate(self, job_id):
         return by_id(checklist.evaluate(jobs.load(job_id), profile.load()))
+
+    def test_pursuing_degree_respects_start_date_and_partial_date_uncertainty(self):
+        data = fixture('profile.json')
+        data['education'][0]['end'] = '2034-06'
+        criterion = {'type': 'degree', 'level': 'bachelor', 'status': 'pursuing', 'fields': []}
+        with patch('resuskill_core.checklist.today_key', return_value=(2026, 10, 24)):
+            for start, expected in [('2030-09', 'unknown'), ('2026', 'unknown'),
+                                    ('2026-10-24', 'met'), ('2025', 'met'), ('', 'met')]:
+                with self.subTest(start=start):
+                    data['education'][0]['start'] = start
+                    saved, _, _ = profile.save(data)
+                    job = jobs.add('Example', 'Intern', 'Currently pursuing a bachelor degree')['id']
+                    jobs.set_requirements(job, [{'text': 'Current enrollment', 'excerpt': 'Currently pursuing',
+                                                 'criterion': criterion}])
+                    self.assertEqual(checklist.evaluate(jobs.load(job), saved)[0]['status'], expected)
 
     def test_expected_statuses(self):
         results = self.evaluate(self.seed())

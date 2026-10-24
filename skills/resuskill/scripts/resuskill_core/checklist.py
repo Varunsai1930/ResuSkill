@@ -72,6 +72,10 @@ def _degree(crit: dict, prof: dict) -> tuple[str, str]:
                 pursuing = True
             elif latest <= today:
                 pursuing = False
+        start = date_span(entry.get("start"))
+        if pursuing is True and start and start[1] > today:
+            # A future or ambiguous start cannot establish current enrollment.
+            pursuing = None
         if crit["status"] == "pursuing" and pursuing is not True:
             continue
         if crit["status"] == "completed" and pursuing is not False:

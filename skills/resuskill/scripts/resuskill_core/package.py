@@ -14,7 +14,7 @@ from . import listing
 from .util import ResuError, content_hash, now_iso
 
 DRAFT, APPROVED, STALE = "draft", "approved", "stale"
-VALIDATION_VERSION = 10
+VALIDATION_VERSION = 11
 
 
 def _path(job_id: str):
