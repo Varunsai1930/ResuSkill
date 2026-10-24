@@ -76,6 +76,23 @@ class ChecklistTests(IsolatedHome):
                     'criterion': {'type': 'degree', 'level': 'bachelor', 'status': 'completed', 'fields': ['Computer Science']}}])
                 self.assertEqual(checklist.evaluate(jobs.load(job), saved)[0]['status'], expected)
 
+    def test_country_only_location_does_not_prove_a_city(self):
+        data = fixture('profile.json')
+        data['preferences']['locations'] = []
+        for location, wanted, expected in [
+            ('United States', 'San Francisco, United States', 'unknown'),
+            ('San Francisco, United States', 'San Francisco', 'met'),
+            ('San Francisco, United States', 'United States', 'met'),
+            ('San Francisco, United States', 'San Francisco, United States', 'met'),
+        ]:
+            with self.subTest(location=location, wanted=wanted):
+                data['contact']['location'] = location
+                saved, _, _ = profile.save(data)
+                job = jobs.add('Example', 'Engineer', 'Required location: ' + wanted)['id']
+                jobs.set_requirements(job, [{'text': 'Location', 'excerpt': wanted,
+                                             'criterion': {'type': 'location', 'locations': [wanted]}}])
+                self.assertEqual(checklist.evaluate(jobs.load(job), saved)[0]['status'], expected)
+
     def test_missing_information_stays_unknown(self):
         data = fixture("profile.json")
         data["authorization"] = []
