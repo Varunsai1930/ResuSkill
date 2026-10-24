@@ -94,7 +94,10 @@ def preview(data):
             item['matches'] = [j['id'] for j in matches]
             if len(matches) == 1:
                 old = matches[0]
-                same = all(old.get(k, '') == clean[k] for k in ('company', 'title', 'description', 'location')) and old.get('listing', listing.DEFAULT) == clean['listing']
+                same = (all(old.get(k, '') == clean[k] for k in ('company', 'title', 'description', 'location'))
+                        and old.get('listing', listing.DEFAULT) == clean['listing']
+                        and old.get('url') == clean['source_url']
+                        and (old.get('import_source') or {}).get('observed_at') == clean['observed_at'])
                 item['state'] = 'duplicate' if same else 'update'
             elif len(matches) > 1:
                 item['state'] = 'ambiguous'

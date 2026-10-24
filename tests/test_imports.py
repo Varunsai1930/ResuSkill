@@ -37,6 +37,28 @@ class ImportTests(IsolatedHome):
         imports.apply(data, preview, [1])
         self.assertEqual(len(jobs.list_jobs()), 2)
 
+    def test_changed_import_source_metadata_requires_reviewed_update(self):
+        data = self.records()
+        data[0].update(source_namespace='example', requisition_id='one')
+        jid = imports.apply(data, imports.preview(data), [1])['jobs'][0]
+        for changes in ({'source_url': 'https://example.com/new-posting'},
+                        {'observed_at': '2026-10-24T00:00:00Z'}):
+            with self.subTest(changes=changes):
+                before = jobs.load(jid)
+                data[0].update(changes)
+                preview = imports.preview(data)
+                self.assertEqual(preview['rows'][0]['state'], 'update')
+                with self.assertRaises(ResuError):
+                    imports.apply(data, preview, [1])
+                self.assertEqual(jobs.load(jid), before)
+                imports.apply(data, preview, [1], {1: jid})
+                after = jobs.load(jid)
+                self.assertEqual(after['url'], data[0]['source_url'])
+                self.assertEqual(after['import_source']['observed_at'], data[0]['observed_at'])
+                self.assertEqual(after['revision'], before['revision'] + 1)
+                self.assertEqual(after['tracking'], before['tracking'])
+                self.assertEqual(imports.preview(data)['rows'][0]['state'], 'duplicate')
+
     def test_update_requires_selection_preserves_package_and_tracking(self):
         data = self.records()
         jid = imports.apply(data, imports.preview(data), [1])['jobs'][0]
