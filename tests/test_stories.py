@@ -99,7 +99,7 @@ class StoryTests(IsolatedHome):
         ident = self.accepted()
         output = Path(self.work.name) / 'export'
         stories.export(ident, output)
-        html = (output / 'story.html').read_text()
+        html = (output / 'story.html').read_text(encoding='utf-8')
         self.assertNotIn('<script>', html)
         self.assertIn('Result unknown', html)
         self.assertIn('日本語', html)

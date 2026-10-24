@@ -78,7 +78,7 @@ class LetterTests(IsolatedHome):
         letters.accept(self.jid)
         target = Path(self.target.name) / 'html'
         letters.export(self.jid, target)
-        html = (target / 'letter.html').read_text()
+        html = (target / 'letter.html').read_text(encoding='utf-8')
         self.assertNotIn('<script>', html)
         self.assertIn('日本語', html)
         before = (target / 'letter.html').read_bytes()

@@ -65,7 +65,7 @@ class ListingTests(IsolatedHome):
         warnings = package.check(job)[1]
         self.assertTrue(any('Relocation required' in w for w in warnings))
         self.assertTrue(any('Summer year unknown' in w for w in warnings))
-        body = Path(render.render(job)['review']).read_text()
+        body = Path(render.render(job)['review']).read_text(encoding='utf-8')
         self.assertIn('&lt;script&gt;', body)
         self.assertNotIn('<script>', body)
 
