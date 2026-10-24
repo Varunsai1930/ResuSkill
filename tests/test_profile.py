@@ -7,6 +7,29 @@ from resuskill_core.util import ResuError
 
 
 class ProfileTests(IsolatedHome):
+    def test_zero_ids_are_rejected_before_creating_a_profile(self):
+        for section, entry in (
+            ('education', {'id': 'edu-0', 'institution': 'Example'}),
+            ('experience', {'id': 'exp-0', 'organization': 'Example'}),
+            ('projects', {'id': 'proj-0', 'name': 'Example'}),
+            ('certifications', {'id': 'cert-0', 'name': 'Example'}),
+        ):
+            with self.subTest(section=section), self.assertRaises(ResuError):
+                profile.save({'contact': {'name': 'Candidate'}, section: [entry]})
+        self.assertIsNone(profile.load(required=False))
+
+    def test_zero_id_edit_preserves_the_saved_profile(self):
+        data = fixture('profile.json')
+        data['certifications'] = [{'name': 'Example'}]
+        saved, _, _ = profile.save(data)
+        for section in ('education', 'experience', 'projects', 'certifications'):
+            changed = copy.deepcopy(saved)
+            prefix = changed[section][0]['id'].rsplit('-', 1)[0]
+            changed[section][0]['id'] = prefix + '-0'
+            with self.subTest(section=section), self.assertRaises(ResuError):
+                profile.save(changed)
+            self.assertEqual(profile.load(), saved)
+
     def test_save_assigns_stable_ids_and_revision(self):
         saved, changes, _ = profile.save(fixture("profile.json"))
         self.assertEqual(saved["_meta"]["revision"], 1)

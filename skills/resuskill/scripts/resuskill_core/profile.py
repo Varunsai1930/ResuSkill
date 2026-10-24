@@ -225,7 +225,8 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
             entry_id = _clean_str(entry.get("id"))
             previous = None
             if entry_id:
-                if not re.fullmatch(rf"{prefix}-\d+", entry_id):
+                match = re.fullmatch(rf"{prefix}-(\d+)", entry_id)
+                if not match or int(match.group(1)) < 1:
                     errors.append(f"{where}.id must look like {prefix}-N (got {entry_id!r})")
                 previous = current_by_id.get(entry_id)
             else:
@@ -332,7 +333,8 @@ def normalize(data: dict, current: dict | None = None) -> tuple[dict, list[str]]
     for index, cert in certs:
         if not cert.get("id"):
             cert["id"] = _next_id(counters, "cert")
-        if not re.fullmatch(r"cert-\d+", cert["id"]) or cert["id"] in seen_ids:
+        match = re.fullmatch(r"cert-(\d+)", cert["id"])
+        if not match or int(match.group(1)) < 1 or cert["id"] in seen_ids:
             errors.append(f"certifications[{index}].id must be a unique cert-N id")
         seen_ids.add(cert["id"])
     certs = [cert for _, cert in certs]
