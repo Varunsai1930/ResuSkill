@@ -1,6 +1,6 @@
 from helpers import IsolatedHome, fixture
 
-from resuskill_core import jobs, profile, validate
+from resuskill_core import jobs, package, profile, validate
 from resuskill_core.skills import find_terms
 from resuskill_core.util import ResuError
 
@@ -91,6 +91,51 @@ class AnswerValidationTests(IsolatedHome):
         errors = validate.validate_answer(profile.load(), jobs.load(job_id), "I enjoy working in Python and SQL.",
                                           ["skill:python", "skill:sql"], None, "chars")
         self.assertEqual(errors, [])
+
+
+class DegreeProgressTests(IsolatedHome):
+    def test_unfinished_degrees_cannot_become_held_credentials(self):
+        for source, claim in (
+            ("Pursuing a Master's degree in Computer Science", "Master's degree holder in Computer Science"),
+            ('Studying for a B.S. degree', 'Bachelor of Science degree holder'),
+            ('Ph.D. candidate', 'Doctorate holder'),
+            ('MBA expected next year', 'MBA holder'),
+            ("Master's degree candidate", "Master's degree holder"),
+            ('Pursuing a B.S., completed an M.S.', "Bachelor's degree holder"),
+            ('Pursuing a B.S. and completed an M.S.', "Bachelor's degree holder"),
+            ('Pursuing a B.S. Completed an M.S.', "Bachelor's degree holder"),
+            ('M.S., expected 2099, B.S. completed', "Master's degree holder"),
+        ):
+            with self.subTest(source=source):
+                self.assertTrue(validate.claim_problems(claim, [source], set(), ()))
+                self.assertEqual(validate.claim_problems(source, [source], set(), ()), [])
+        self.assertEqual(validate.claim_problems("Master's degree holder", ["Master of Science graduate"], set(), ()), [])
+
+    def test_mixed_completed_and_pending_degrees_keep_their_own_status(self):
+        for source in (
+            'Completed a B.S. Pursuing an M.S.',
+            'Completed a B.S. Currently pursuing an M.S.',
+            "Bachelor of Science graduate, currently pursuing a Master's degree",
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(validate.claim_problems("Bachelor's degree holder", [source], set(), ()), [])
+                self.assertTrue(validate.claim_problems("Master's degree holder", [source], set(), ()))
+        self.assertTrue(validate.claim_problems("Master's degree holder", ['M.S., expected 2099'], set(), ()))
+        self.assertTrue(validate.claim_problems("Master's degree holder", ['Pursuing an MBA, M.S. in Analytics'], set(), ()))
+
+    def test_pending_degree_rejected_through_resume_and_answer_proposals(self):
+        prof, _, _ = profile.save({'contact': {'name': 'Candidate'},
+                                  'summary': "Pursuing a Master's degree in Computer Science",
+                                  'education': [{'institution': 'Example', 'degree': 'M.S.', 'end': '2099'}]})
+        job = jobs.add('Example', 'Engineer', 'Engineering')['id']
+        jobs.set_requirements(job, [])
+        claim = "Master's degree holder in Computer Science"
+        for source in ('summary', prof['education'][0]['id']):
+            with self.subTest(source=source), self.assertRaises(ResuError):
+                package.propose_resume(job, {'summary': {'text': claim, 'sources': [source]}})
+        package.add_question(job, 'Why do you want this role?', True, None, 'chars', None)
+        with self.assertRaises(ResuError):
+            package.propose_answers(job, [{'question_id': 'q1', 'text': claim, 'sources': ['summary']}])
 
 
 class TermDetectionTests(IsolatedHome):

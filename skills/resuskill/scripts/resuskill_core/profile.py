@@ -11,7 +11,7 @@ import re
 
 from . import SCHEMA_VERSION, store, input_schema
 from .skills import canon
-from .util import ResuError, is_valid_date, norm_text, now_iso
+from .util import ResuError, date_span, is_valid_date, norm_text, now_iso, today_key
 
 ENTRY_SECTIONS = {"education": "edu", "experience": "exp", "projects": "proj"}
 WORK_MODES = {"remote", "hybrid", "onsite", "any", None}
@@ -508,6 +508,11 @@ def sources(prof: dict) -> dict[str, dict]:
                 for f in ("title", "role", "organization", "name", "degree", "field", "institution")
                 if entry.get(f)
             )
+            if section == "education":
+                end = entry.get("graduation") or entry.get("end")
+                span = date_span(end)
+                if end == "present" or (span and span[0] > today_key()):
+                    label = ("In progress: " if end == "present" else "Expected: ") + label
             index[entry["id"]] = {
                 "kind": section,
                 "entry": entry["id"],

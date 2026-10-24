@@ -70,6 +70,11 @@ _CLAUSE_RE = re.compile(r"[^.;!?\n]+")
 
 _CREDENTIAL_RES = {name: re.compile(rf"(?<!\w)(?:{pat})(?!\w)", re.IGNORECASE) for name, pat in _CREDENTIALS.items()}
 _PROFESSIONAL_RES = {name: re.compile(rf"(?<!\w)(?:{pat})(?!\w)") for name, pat in _PROFESSIONAL.items()}
+_DEGREES = ("doctorate", "bachelor's degree", "master's degree", "mba", "degree")
+_DEGREE_TOKEN_RE = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(name) for name in _DEGREES) + r")(?!\w)")
+_DEGREE_DONE_RE = re.compile(r"\b(?:completed?|graduated?|earned|awarded|holders?|holds?|received)\b")
+_DEGREE_DONE_SUFFIX_RE = re.compile(r"\b(?:holders?|graduate)\b")
+_DEGREE_PENDING_SUFFIX_RE = re.compile(r"\b(?:candidates?|candidacy|in progress|expected)\b")
 
 
 def _number_key(raw: str, scale: int = 0) -> str:
@@ -92,9 +97,39 @@ def numbers(text: str) -> set[str]:
 
 def credentials(text: str) -> set[str]:
     text = norm_text(text)  # unify curly apostrophes so "Master’s" matches
-    found = {name for name, regex in _CREDENTIAL_RES.items() if regex.search(text)}
-    # A professional credential counts as held only when its clause has no progress wording.
+    # Expand degree abbreviations before splitting sentences: the periods in
+    # "Studying for an M.S." must not separate the degree from its status.
+    for name in _DEGREES:
+        regex = _CREDENTIAL_RES[name]
+        if name.endswith(" degree"):
+            regex = re.compile(regex.pattern + r"(?:\s+degree)?", regex.flags)
+        text = regex.sub(name, text)
+    found = {name for name, regex in _CREDENTIAL_RES.items() if name not in _DEGREES and regex.search(text)}
     for clause in _CLAUSE_RE.findall(text):
+        degrees = list(_DEGREE_TOKEN_RE.finditer(clause))
+        for index, match in enumerate(degrees):
+            # Lists inherit the last stated status until an explicit change.
+            # Prefix verbs describe the next degree; trailing qualifiers such as
+            # "candidate" or "expected" also describe the preceding degree.
+            before = clause[:match.start()]
+            stop = degrees[index + 1].start() if index + 1 < len(degrees) else len(clause)
+            after = clause[match.end():stop]
+            completion_after = after
+            if index + 1 < len(degrees):
+                # After a list separator, status wording belongs to the next
+                # degree ("Pursuing B.S., completed M.S.").
+                completion_after = re.split(r",|\band\b|\bbut\b", after, maxsplit=1)[0]
+            statuses = [(m.start(), True) for m in _PROGRESS_RE.finditer(before)]
+            statuses += [(m.start(), False) for m in _DEGREE_DONE_RE.finditer(before)]
+            in_progress = max(statuses)[1] if statuses else False
+            trailing = [(m.start(), True) for m in _DEGREE_PENDING_SUFFIX_RE.finditer(after)]
+            done_suffix = _DEGREE_DONE_SUFFIX_RE if index + 1 < len(degrees) else _DEGREE_DONE_RE
+            trailing += [(m.start(), False) for m in done_suffix.finditer(completion_after)]
+            if trailing:
+                in_progress = max(trailing)[1]
+            name = match.group()
+            keys = (name, "degree") if name.endswith(" degree") else (name,)
+            found.update(f"{key} (in progress)" if in_progress else key for key in keys)
         in_progress = bool(_PROGRESS_RE.search(clause))
         for name, regex in _PROFESSIONAL_RES.items():
             if not regex.search(clause):
