@@ -293,6 +293,32 @@ class PublicReadinessTests(IsolatedHome):
                                   env=env, capture_output=True, text=True)
         self.assertEqual(conflict.returncode, 1)
 
+    def test_installer_copy_does_not_report_a_symlink_as_a_copy(self):
+        if os.name == 'nt' or not shutil.which('bash'):
+            self.skipTest('Bash installer is tested on Unix; Windows supports manual copy')
+        for target in ('claude', 'codex'):
+            config = Path(self._tmp) / (target + ' config')
+            skills = config / 'skills'
+            env = {**os.environ, 'CLAUDE_CONFIG_DIR': str(config), 'RESUSKILL_CODEX_SKILLS_DIR': str(skills)}
+            def install(*options):
+                return subprocess.run(['bash', str(ROOT / 'install.sh'), target, *options],
+                                      env=env, capture_output=True, text=True)
+            with self.subTest(target=target):
+                linked = install()
+                self.assertEqual(linked.returncode, 0, linked.stderr)
+                installed = skills / 'resuskill'
+                self.assertTrue(installed.is_symlink())
+                self.assertEqual(install().returncode, 0)
+                refused = install('--copy')
+                self.assertEqual(refused.returncode, 1)
+                self.assertIn('remove it first to reinstall', refused.stderr)
+                self.assertTrue(installed.is_symlink())
+                installed.unlink()
+                copied = install('--copy')
+                self.assertEqual(copied.returncode, 0, copied.stderr)
+                self.assertFalse(installed.is_symlink())
+                self.assertTrue((installed / 'scripts/resuskill.py').is_file())
+
 
 if __name__ == "__main__":
     import unittest

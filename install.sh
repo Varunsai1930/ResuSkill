@@ -33,7 +33,7 @@ for target in "${TARGETS[@]}"; do
   mkdir -p "$dir"
   dest="$dir/resuskill"
   if [ -e "$dest" ] || [ -L "$dest" ]; then
-    if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$SRC" ]; then
+    if [ "$MODE" = link ] && [ -L "$dest" ] && [ "$(readlink "$dest")" = "$SRC" ]; then
       echo "✓ $target: already linked at $dest"
       continue
     fi
