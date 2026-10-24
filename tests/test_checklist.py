@@ -63,6 +63,19 @@ class ChecklistTests(IsolatedHome):
         self.assertEqual(results["r6"]["status"], "unmet")     # Rust explicitly absent
         self.assertEqual(results["r7"]["status"], "met")
 
+    def test_broad_degree_field_does_not_prove_a_specialization(self):
+        data = fixture('profile.json')
+        data['education'][0]['end'] = '2020'
+        for field, expected in [('Science', 'unknown'), ('Computer Science', 'met'),
+                                ('Computer Science and Engineering', 'met'), ('Economics', 'unknown')]:
+            with self.subTest(field=field):
+                data['education'][0]['field'] = field
+                saved, _, _ = profile.save(data)
+                job = jobs.add('Example', 'Engineer', 'Completed bachelor in Computer Science')['id']
+                jobs.set_requirements(job, [{'text': 'Computer Science degree', 'excerpt': 'Computer Science',
+                    'criterion': {'type': 'degree', 'level': 'bachelor', 'status': 'completed', 'fields': ['Computer Science']}}])
+                self.assertEqual(checklist.evaluate(jobs.load(job), saved)[0]['status'], expected)
+
     def test_missing_information_stays_unknown(self):
         data = fixture("profile.json")
         data["authorization"] = []

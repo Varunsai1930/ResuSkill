@@ -46,7 +46,7 @@ def _field_matches(field: str, wanted: list[str]) -> bool:
     if not wanted:
         return True
     field_n = norm_text(field)
-    return bool(field_n) and any(_phrase_in(norm_text(w), field_n) or _phrase_in(field_n, norm_text(w)) for w in wanted)
+    return bool(field_n) and any(_phrase_in(norm_text(w), field_n) for w in wanted)
 
 
 def _degree(crit: dict, prof: dict) -> tuple[str, str]:
