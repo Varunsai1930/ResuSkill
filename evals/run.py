@@ -269,14 +269,17 @@ def run_case(case_dir, timeout=600, codex="codex", default_config=False):
     if timeout <= 0:
         raise ValueError("timeout must be positive")
     evidence = case_dir / "evidence"
-    evidence.mkdir(exist_ok=False)
     workspace = case_dir / "workspace"
     prompt = (case_dir / "prompt.txt").read_text(encoding="utf-8")
-    write_json(evidence / "before.json", inventory(workspace))
+    before = inventory(workspace)
     config_home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     command = [codex, "exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check",
                "-C", str(workspace), "--output-last-message", str(evidence / "final.txt"),
                *(["--ignore-user-config"] if default_config else mcp_overrides(config_home / "config.toml")), "-"]
+    # Complete read-only preflight before reserving evidence or changing status,
+    # so a configuration/input failure can be corrected and retried safely.
+    evidence.mkdir(exist_ok=False)
+    write_json(evidence / "before.json", before)
     env = dict(os.environ, RESUSKILL_HOME=str(workspace / "home"), PYTHONDONTWRITEBYTECODE="1")
     metadata.update(execution_status="running", started_at=now(), command=command,
                     config_mode="client_defaults" if default_config else "user_config",

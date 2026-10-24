@@ -40,6 +40,30 @@ class EvalRunnerTests(IsolatedHome):
         with self.assertRaises(ValueError):
             runner.prepare(Path(self._tmp) / "unknown", ["e99"])
 
+    def test_configuration_error_does_not_prevent_default_config_retry(self):
+        case = self.prepare(('e01',)) / 'e01'
+        before = (case / 'case.json').read_bytes()
+        with patch.object(runner, 'mcp_overrides', side_effect=ValueError('Invalid TOML')):
+            with self.assertRaisesRegex(ValueError, 'Invalid TOML'):
+                runner.run_case(case, codex='fake-codex')
+        self.assertFalse((case / 'evidence').exists())
+        self.assertEqual((case / 'case.json').read_bytes(), before)
+        version = subprocess.CompletedProcess(['fake-codex', '--version'], 0, 'test', '')
+        with patch.object(runner.subprocess, 'run', return_value=version), \
+                patch.object(runner.subprocess, 'Popen', return_value=Mock(returncode=0)):
+            result = runner.run_case(case, codex='fake-codex', default_config=True)
+        self.assertEqual(result['execution_status'], 'completed')
+        self.assertIsNone(result['passed'])
+
+    def test_inventory_preflight_error_leaves_case_unrun_and_retryable(self):
+        case = self.prepare(('e01',)) / 'e01'
+        before = (case / 'case.json').read_bytes()
+        with patch.object(runner, 'inventory', side_effect=OSError('Unreadable file')):
+            with self.assertRaisesRegex(OSError, 'Unreadable file'):
+                runner.run_case(case, codex='fake-codex', default_config=True)
+        self.assertFalse((case / 'evidence').exists())
+        self.assertEqual((case / 'case.json').read_bytes(), before)
+
     def test_new_job_identity_preserves_case_input_without_leaking_expectations(self):
         selected = ("e01", "e02", "e03", "e04", "e05", "e13", "e17", "e18", "e23")
         output = self.prepare(selected)
