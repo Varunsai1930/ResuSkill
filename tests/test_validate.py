@@ -31,6 +31,16 @@ class ProposalValidationTests(IsolatedHome):
     def test_python_only_source_never_gains_java(self):
         self.assertRejected(one_bullet("Built a Java REST API serving 1,200 users", ["exp-1-b1"]), "Java")
 
+    def test_hyphenated_technology_claims_need_evidence(self):
+        for text, technology in (
+            ('Built Kubernetes-based services', 'Kubernetes'),
+            ('Built AWS-powered services', 'Amazon Web Services'),
+        ):
+            with self.subTest(text=text):
+                self.assertRejected(one_bullet(text, ['exp-1-b1']), technology)
+        validate.validate_proposal(self.prof, self.job,
+                                   one_bullet('Built Python-based services', ['exp-1-b1']))
+
     def test_new_metric_rejected(self):
         self.assertRejected(one_bullet("Reduced report time by 60% using PostgreSQL indexes", ["exp-1-b2"]), "60")
 
@@ -94,3 +104,9 @@ class TermDetectionTests(IsolatedHome):
 
     def test_java_not_found_inside_javascript(self):
         self.assertNotIn("java", find_terms("Wrote JavaScript"))
+
+    def test_hyphen_modifiers_preserve_technology_boundaries(self):
+        found = find_terms('Kubernetes-based AWS-powered C++-based C#-based services')
+        self.assertTrue({'kubernetes', 'amazon web services', 'c++', 'c#'} <= found)
+        self.assertNotIn('c', found)
+        self.assertNotIn('c', find_terms('Objective-C'))

@@ -115,7 +115,9 @@ def _spelling_pattern(spelling: str, case_sensitive: bool) -> re.Pattern:
     body = re.escape(spelling).replace(r"\ ", r"[\s-]+")
     # Boundaries: not glued to letters/digits; '+', '#' and '.' count as part of a term.
     # '/' separates terms ("Python/Django", "C/C++"), so it is a boundary on both sides.
-    pattern = rf"(?<![\w+#.&-]){body}(?![\w+#&]|-\w)"
+    # A trailing hyphen introduces modifiers such as "Kubernetes-based".
+    # Keep the leading guard so "Objective-C" does not also match bare "C".
+    pattern = rf"(?<![\w+#.&-]){body}(?![\w+#&])"
     return re.compile(pattern, 0 if case_sensitive else re.IGNORECASE)
 
 
