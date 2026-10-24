@@ -148,7 +148,8 @@ def resume_body(prof: dict, resume: dict, style: dict | None = None) -> str:
         # Uncategorized skills go last, labelled "Other" when named categories exist.
         uncategorized = categories.pop("Skills", None)
         if uncategorized:
-            categories["Other" if categories else "Skills"] = uncategorized
+            label = "Other" if categories else "Skills"
+            categories[label] = categories.pop(label, []) + uncategorized
         rows = "".join(f"<p><b>{_e(cat)}:</b> {_e(', '.join(names))}</p>" for cat, names in categories.items())
         sections['skills'] = f'<section class="skills"><h2>{settings["skills_heading"]}</h2>{rows}</section>'
 
@@ -363,7 +364,8 @@ def pdf_name(prof: dict) -> str:
 
 def pdf_stamp(prof: dict, resume: dict, style: dict | None = None) -> dict:
     """What a resume PDF was printed from, so a snapshot can tell a current PDF from a stale one."""
-    result = {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"]}
+    # Older renderers could omit selected skills; their PDFs require a new export.
+    result = {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"], "render_version": 2}
     settings = style_mod.normalize(style)
     if settings != style_mod.DEFAULT:
         result['style_hash'] = content_hash(settings)

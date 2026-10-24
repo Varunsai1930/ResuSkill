@@ -8,6 +8,33 @@ from resuskill_core.util import ResuError
 
 
 class StyleTests(IsolatedHome):
+    def test_other_category_keeps_explicit_and_uncategorized_skills(self):
+        job = self.seed()
+        prof = profile.load()
+        prof['skills'] = [{'name': 'Python', 'category': 'Other'}, {'name': 'SQL'},
+                          {'name': 'Flask', 'category': 'Frameworks'}]
+        profile.save(prof)
+        package.propose_resume(job, {'skills': ['Python', 'SQL', 'Flask']})
+        package.accept_resume(job)
+        html = Path(render.render(job)['resume']).read_text()
+        self.assertIn('<b>Other:</b> Python, SQL</p>', html)
+        self.assertLess(html.index('<b>Frameworks:</b>'), html.index('<b>Other:</b>'))
+
+    def test_snapshot_excludes_pdf_from_older_skill_renderer(self):
+        job = self.seed()
+        package.propose_resume(job, fixture('proposal_good.json'))
+        package.accept_resume(job)
+        prof = profile.load()
+        pdf = render.out_dir(job) / render.pdf_name(prof)
+        pdf.write_bytes(b'%PDF-1.4\n%%EOF\n')
+        old_stamp = render.pdf_stamp(prof, package.load(job)['resume'])
+        old_stamp.pop('render_version', None)
+        store.write_json(render.stamp_path(pdf), old_stamp)
+        package.approve(job)
+        frozen = track.snapshot(job)
+        result = store.read_json(store.job_dir(job) / 'snapshots' / frozen / 'package.json')
+        self.assertIsNone(result['pdf'])
+
     def test_rejects_injection_unknown_options_and_hidden_sections(self):
         for value in ({"accent": "red;display:none"}, {"font": "url(https://example.test)"},
                       {"font_size_pt": True}, {"font_size_pt": 0}, {"css": "body{}"},
