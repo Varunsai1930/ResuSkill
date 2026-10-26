@@ -517,6 +517,8 @@ def sources(prof: dict) -> dict[str, dict]:
                 span = date_span(end)
                 if end == "present" or (span and span[0] > today_key()):
                     label = ("In progress: " if end == "present" else "Expected: ") + label
+                elif not span or span[1] > today_key():
+                    label = "Completion unconfirmed: " + label
             index[entry["id"]] = {
                 "kind": section,
                 "entry": entry["id"],

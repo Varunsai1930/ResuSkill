@@ -1,4 +1,5 @@
 from helpers import IsolatedHome, fixture
+from unittest.mock import patch
 
 from resuskill_core import jobs, package, profile, validate
 from resuskill_core.skills import find_terms
@@ -94,6 +95,44 @@ class AnswerValidationTests(IsolatedHome):
 
 
 class DegreeProgressTests(IsolatedHome):
+    def test_mixed_unknown_completed_and_pending_degrees_keep_their_own_status(self):
+        for source in ("Completed a Bachelor's degree, Master's degree completion unknown.",
+                       "Completion unknown: Master's degree, completed a Bachelor's degree.",
+                       "Bachelor's degree holder and Master's degree completion unknown."):
+            with self.subTest(source=source):
+                self.assertEqual(validate.claim_problems("Bachelor's degree holder", [source], set(), ()), [])
+                self.assertTrue(validate.claim_problems("Master's degree holder", [source], set(), ()))
+        source = "Pursuing a Bachelor's degree, Master's degree completion unknown."
+        self.assertEqual(validate.claim_problems("Pursuing a Bachelor's degree", [source], set(), ()), [])
+        self.assertTrue(validate.claim_problems("Bachelor's degree holder", [source], set(), ()))
+
+    def test_uncertain_education_cannot_support_completed_or_pursuing_claims(self):
+        with patch.object(profile, 'today_key', return_value=(2026, 10, 26)):
+            for end in ('2026', '2026-10', ''):
+                with self.subTest(end=end):
+                    prof, _, _ = profile.save({'contact': {'name': 'Candidate'}, 'education': [
+                        {'institution': 'Example', 'degree': 'B.S.', 'field': 'Computer Science', 'end': end}]})
+                    jid = jobs.add('Example', 'Engineer', 'Engineering')['id']
+                    jobs.set_requirements(jid, [])
+                    for text in ('I earned a Bachelor degree in Computer Science.',
+                                 'I am pursuing a Bachelor degree in Computer Science.'):
+                        draft = {'summary': {'text': text, 'sources': ['edu-1']}}
+                        with self.subTest(text=text), self.assertRaises(ResuError):
+                            package.propose_resume(jid, draft)
+                        self.assertTrue(validate.validate_answer(prof, jobs.load(jid), text, ['edu-1'], None, 'chars'))
+                    self.assertIn('Completion unconfirmed', profile.sources(prof)['edu-1']['text'])
+
+    def test_definite_degree_dates_keep_completed_and_pending_claims_distinct(self):
+        with patch.object(profile, 'today_key', return_value=(2026, 10, 26)):
+            for end, held in (('2025', True), ('2026-09', True), ('2026-10-26', True),
+                              ('2026-10-27', False), ('2027', False), ('present', False)):
+                with self.subTest(end=end):
+                    prof, _ = profile.normalize({'contact': {'name': 'Candidate'}, 'education': [
+                        {'institution': 'Example', 'degree': 'B.S.', 'end': end}]})
+                    problems = validate.claim_problems('Bachelor degree holder',
+                                                      [profile.sources(prof)['edu-1']['text']], set(), ())
+                    self.assertEqual(not problems, held)
+
     def test_unfinished_degrees_cannot_become_held_credentials(self):
         for source, claim in (
             ("Pursuing a Master's degree in Computer Science", "Master's degree holder in Computer Science"),

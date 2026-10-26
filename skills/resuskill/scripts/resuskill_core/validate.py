@@ -75,6 +75,7 @@ _DEGREE_TOKEN_RE = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(name) for name 
 _DEGREE_DONE_RE = re.compile(r"\b(?:completed?|graduated?|earned|awarded|holders?|holds?|received)\b")
 _DEGREE_DONE_SUFFIX_RE = re.compile(r"\b(?:holders?|graduate)\b")
 _DEGREE_PENDING_SUFFIX_RE = re.compile(r"\b(?:candidates?|candidacy|in progress|expected)\b")
+_DEGREE_UNKNOWN_RE = re.compile(r"\bcompletion (?:unconfirmed|unknown)\b")
 
 
 def _number_key(raw: str, scale: int = 0) -> str:
@@ -121,15 +122,18 @@ def credentials(text: str) -> set[str]:
                 completion_after = re.split(r",|\band\b|\bbut\b", after, maxsplit=1)[0]
             statuses = [(m.start(), True) for m in _PROGRESS_RE.finditer(before)]
             statuses += [(m.start(), False) for m in _DEGREE_DONE_RE.finditer(before)]
+            statuses += [(m.start(), None) for m in _DEGREE_UNKNOWN_RE.finditer(before)]
             in_progress = max(statuses)[1] if statuses else False
             trailing = [(m.start(), True) for m in _DEGREE_PENDING_SUFFIX_RE.finditer(after)]
             done_suffix = _DEGREE_DONE_SUFFIX_RE if index + 1 < len(degrees) else _DEGREE_DONE_RE
             trailing += [(m.start(), False) for m in done_suffix.finditer(completion_after)]
+            trailing += [(m.start(), None) for m in _DEGREE_UNKNOWN_RE.finditer(completion_after)]
             if trailing:
                 in_progress = max(trailing)[1]
             name = match.group()
             keys = (name, "degree") if name.endswith(" degree") else (name,)
-            found.update(f"{key} (in progress)" if in_progress else key for key in keys)
+            suffix = " (completion unknown)" if in_progress is None else " (in progress)" if in_progress else ""
+            found.update(key + suffix for key in keys)
         in_progress = bool(_PROGRESS_RE.search(clause))
         for name, regex in _PROFESSIONAL_RES.items():
             if not regex.search(clause):

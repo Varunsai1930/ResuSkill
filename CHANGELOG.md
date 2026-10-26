@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep partial or missing graduation dates explicitly unconfirmed in claim sources; reject completed or pursuing degree claims unless supported. Validation policy v15 requires renewed package review.
+
 - Add offline reviewed shortlist previews and explicit application of selected rows, with duplicate detection, stale-preview rejection and resumable import journals.
 
 - Add historical submission cohorts with separate current-status, reached-stage and frozen-fit denominators; disclose incomplete history and suppress small-sample percentages.
