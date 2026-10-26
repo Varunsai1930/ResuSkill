@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate tracking-history shapes before listing dates. A damaged job remains visible as unreadable beside healthy jobs, and `jobs` returns partial results with exit 1 instead of a traceback.
+
 - Stage resume/review HTML and styling before publication; use atomic file replacement with rollback. Preserve prior exports on partial writes or publication failures, and retain recovery copies if rollback itself fails.
 
 - Bind exported PDF provenance to SHA-256 file contents. Skip replaced, incomplete or legacy unstamped PDFs in submitted snapshots, and recheck copied bytes before recording submission. Re-export older PDFs to establish current provenance.

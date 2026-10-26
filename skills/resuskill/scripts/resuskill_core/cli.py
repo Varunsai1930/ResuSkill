@@ -182,7 +182,7 @@ def cmd_jobs(args) -> None:
     table = track_mod.rows()
     if args.json or not table:
         out(table, args.json, "No jobs saved yet.")
-        return
+        return 1 if any(r.get('error') for r in table) else 0
     print(f"{'JOB':34} {'COMPANY':18} {'TITLE':26} {'REVIEW':9} {'STATUS':11} {'LISTING':14} {'CHECKLIST':16} UPDATED")
     for r in table:
         counts = r["checklist"]
@@ -196,6 +196,7 @@ def cmd_jobs(args) -> None:
     for r in table:
         if r.get("error"):
             print(f"warning: {r['id']}: {r['error']}", file=sys.stderr)
+    return 1 if any(r.get('error') for r in table) else 0
 
 
 def checklist_text(results: list[dict]) -> str:

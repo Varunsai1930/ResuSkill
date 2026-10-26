@@ -107,12 +107,27 @@ def add_note(job_id: str, text: str) -> dict:
     return job
 
 
+def _tracking_updated(job: dict) -> str:
+    history = job['tracking'].get('history', [])
+    if not isinstance(history, list):
+        raise ResuError('Stored tracking history must be a list; restore a valid backup.')
+    for index, event in enumerate(history):
+        if (not isinstance(event, dict) or not isinstance(event.get('status'), str)
+                or not isinstance(event.get('at'), str) or not event['at']):
+            raise ResuError(f'Stored tracking history entry {index + 1} needs status and timestamp text; restore a valid backup.')
+    value = history[-1]['at'] if history else job.get('created_at', '-')
+    if not isinstance(value, str):
+        raise ResuError('Stored creation timestamp must be text; restore a valid backup.')
+    return value[:10]
+
+
 def rows() -> list[dict]:
     prof = profile_mod.load(required=False)
     table = []
     problems: list[tuple[str, str]] = []
     for job in jobs_mod.list_jobs(problems):
         try:
+            updated = _tracking_updated(job)
             pkg = package_mod.load(job["id"])
             review = package_mod.review_state(job, pkg, prof)
         except ResuError as exc:
@@ -125,7 +140,7 @@ def rows() -> list[dict]:
             "title": job["title"],
             "review": review,
             "status": job["tracking"]["status"],
-            "updated": (job["tracking"]["history"][-1]["at"] if job["tracking"].get("history") else job.get("created_at", "-"))[:10],
+            "updated": updated,
             "checklist": counts,
             "listing": listing.assess(job),
         })

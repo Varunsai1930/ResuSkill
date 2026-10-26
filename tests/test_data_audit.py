@@ -1,11 +1,14 @@
 """Regression tests for profile allocation and stored-data audit findings."""
 
 import copy
+import json
+import io
+from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, jobs, profile, store, track
+from resuskill_core import checklist, cli, jobs, profile, store, track
 from resuskill_core.util import ResuError
 
 
@@ -109,6 +112,37 @@ class AvailabilityTests(IsolatedHome):
 
 
 class StoredJsonTests(IsolatedHome):
+    def test_malformed_tracking_history_keeps_healthy_jobs_visible_without_writes(self):
+        healthy = jobs.add('Healthy', 'Engineer', 'Description')
+        damaged = jobs.add('Damaged', 'Engineer', 'Description')
+        for history in (None, {}, 'bad', [None], [{}], [{'status': 'saved'}],
+                        [{'status': 'saved', 'at': []}], [{'status': [], 'at': '2026-01-01'}]):
+            with self.subTest(history=history):
+                damaged['tracking']['history'] = history
+                jobs.save(damaged)
+                path = store.job_dir(damaged['id']) / 'job.json'
+                before = path.read_bytes()
+                rows = {r['id']: r for r in track.rows()}
+                self.assertEqual(rows[damaged['id']]['review'], 'unreadable')
+                self.assertIn('restore a valid backup', rows[damaged['id']]['error'])
+                self.assertEqual(rows[healthy['id']]['review'], 'draft')
+                output, errors = io.StringIO(), io.StringIO()
+                with redirect_stdout(output), redirect_stderr(errors):
+                    self.assertEqual(cli.main(['jobs', '--json']), 1)
+                self.assertEqual(len(json.loads(output.getvalue())), 2)
+                self.assertNotIn('Traceback', errors.getvalue())
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_empty_or_legacy_missing_history_uses_creation_date(self):
+        job = jobs.add('Legacy', 'Engineer', 'Description')
+        for history in ([], None):
+            if history is None:
+                job['tracking'].pop('history', None)
+            else:
+                job['tracking']['history'] = history
+            jobs.save(job)
+            self.assertEqual(track.rows()[0]['updated'], job['created_at'][:10])
+
     def test_damaged_nested_requirements_keep_job_listing_and_tracker_usable(self):
         profile.save({"contact": {"name": "Candidate"}, "skills": ["Python"]})
         healthy = jobs.add("Healthy", "Engineer", "Python required.")
