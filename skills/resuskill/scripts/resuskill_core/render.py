@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 import platform
 import re
 import shutil
@@ -495,6 +496,41 @@ def print_pdf(html_path: Path, pdf_path: Path) -> Path:
     return pdf_path
 
 
+def _publish_text_exports(folder: Path, contents: dict[str, str]) -> None:
+    """Prepare complete files, then replace each atomically with rollback on failure."""
+    staging = Path(tempfile.mkdtemp(prefix='.render-', dir=folder))
+    cleanup = True
+    published = []
+    backups = staging / 'previous'
+    backups.mkdir()
+    try:
+        for name, text in contents.items():
+            destination = folder / name
+            if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+                raise ResuError('Export destination must be a regular file: ' + str(destination))
+            (staging / name).write_text(text, encoding='utf-8')
+            if destination.exists():
+                shutil.copy2(destination, backups / name)
+        try:
+            for name in contents:
+                published.append(name)
+                os.replace(staging / name, folder / name)
+        except BaseException:
+            try:
+                for name in reversed(published):
+                    if (backups / name).exists():
+                        os.replace(backups / name, folder / name)
+                    else:
+                        (folder / name).unlink(missing_ok=True)
+            except BaseException as exc:
+                cleanup = False
+                raise ResuError('Export rollback could not finish. Previous files are retained at ' + str(backups) + '; restore them before retrying.') from exc
+            raise
+    finally:
+        if cleanup:
+            shutil.rmtree(staging)
+
+
 def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, style: dict | None = None) -> dict:
     from . import jobs as jobs_mod
 
@@ -516,7 +552,7 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, styl
     outputs: dict[str, str] = {}
 
     review = folder / "review.html"
-    review.write_text(review_html(job, prof, pkg, proposal), encoding="utf-8")
+    contents = {'review.html': review_html(job, prof, pkg, proposal)}
     outputs["review"] = str(review)
 
     if use_proposal:
@@ -525,15 +561,17 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, styl
         resume, target = selected, folder / "preview.html"
     else:
         if not pkg.get("resume"):
+            _publish_text_exports(folder, contents)
             outputs["note"] = "No accepted resume yet; only the review page was written. Use --proposal to preview."
             return outputs
         resume, target = selected, folder / "resume.html"
         state = package_mod.review_state(job, pkg, prof)
         if state != package_mod.APPROVED:
             outputs["note"] = f"Package is {state.upper()}; this resume has not been approved in its current form."
-    target.write_text(resume_html(prof, resume, f"{prof['contact']['name']} — Resume", settings), encoding="utf-8")
+    contents[target.name] = resume_html(prof, resume, f"{prof['contact']['name']} — Resume", settings)
     if style is not None:
-        store.write_json(folder / 'style.json', settings)
+        contents['style.json'] = json.dumps(settings, indent=2, ensure_ascii=False, allow_nan=False) + '\n'
+    _publish_text_exports(folder, contents)
     outputs["resume"] = str(target)
     if want_pdf:
         pdf = folder / (pdf_name(prof) if not use_proposal else "preview.pdf")

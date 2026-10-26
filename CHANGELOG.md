@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stage resume/review HTML and styling before publication; use atomic file replacement with rollback. Preserve prior exports on partial writes or publication failures, and retain recovery copies if rollback itself fails.
+
 - Bind exported PDF provenance to SHA-256 file contents. Skip replaced, incomplete or legacy unstamped PDFs in submitted snapshots, and recheck copied bytes before recording submission. Re-export older PDFs to establish current provenance.
 
 - Keep partial or missing graduation dates explicitly unconfirmed in claim sources; reject completed or pursuing degree claims unless supported. Validation policy v15 requires renewed package review.
