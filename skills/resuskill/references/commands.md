@@ -150,3 +150,5 @@ Drafts remain separate. Show every paragraph and its sources before the user acc
 ### Interview stories (format 2)
 
 `stories propose --file FILE [--id ID]`, `stories accept ID`, `stories list`, `stories show ID [--proposal]`, `stories check [ID]`, `stories export ID --output NEW_DIR`, and `stories suggest JOB` emit JSON. Exports also create escaped HTML with source review. Replacement proposals preserve accepted content. Checks disclose stale references; only current accepted stories are exported or suggested. Suggestions show skill overlap with reviewed requirements, not a claim that every requirement is met. Implementation questions cite confirmed committed excerpts. Interview preparation does not modify application approval; source text reused in an application goes through that artifact's normal review.
+
+PDF submission snapshots require current render metadata and a matching SHA-256 of the PDF bytes, plus a complete header/trailer. Replaced, incomplete and older PDFs without this content fingerprint are omitted with a reason; re-export before recording submission if a PDF is needed. A change during the snapshot copy stops submission recording.

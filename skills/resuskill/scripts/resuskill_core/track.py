@@ -61,7 +61,8 @@ def snapshot(job_id: str) -> str:
         # Freeze the PDF only if it was printed from the approved resume and current profile.
         pdf = render.out_dir(job_id) / render.pdf_name(prof)
         settings = style.saved(render.out_dir(job_id))
-        pdf_current = pdf.exists() and store.read_json(render.stamp_path(pdf)) == render.pdf_stamp(prof, pkg["resume"], settings)
+        pdf_record = store.read_json(render.stamp_path(pdf)) if pdf.exists() else None
+        pdf_current = render._pdf_complete(pdf) and pdf_record == render.pdf_stamp(prof, pkg["resume"], settings, pdf)
         store.write_json(folder / "package.json", {
             "job": {k: job[k] for k in ("id", "company", "title", "location", "url", "revision")},
             "approval": pkg["approval"],
@@ -70,7 +71,7 @@ def snapshot(job_id: str) -> str:
             "profile": prof,
             "pdf": pdf.name if pdf_current else None,
             "pdf_note": None if pdf_current else (
-                "The existing PDF was printed from different content and was not frozen." if pdf.exists() else "No PDF was rendered."
+                "The existing PDF has different content, incomplete output or unverified provenance and was not frozen; export it again." if pdf.exists() else "No PDF was rendered."
             ),
             "frozen_at": now_iso(),
             "render_style": settings,
@@ -80,6 +81,8 @@ def snapshot(job_id: str) -> str:
         shutil.copy2(outputs["review"], folder / "review.html")
         if pdf_current:
             shutil.copy2(pdf, folder / pdf.name)
+            if render.pdf_stamp(prof, pkg['resume'], settings, folder / pdf.name) != pdf_record:
+                raise ResuError('PDF changed while preparing the snapshot; export and review it again.')
         if pkg.get('letter') is not None:
             from . import letters
             (folder / 'letter.html').write_text(letters.html(pkg['letter'], job, prof), encoding='utf-8')

@@ -8,6 +8,7 @@ validated package. Every value is HTML-escaped.
 from __future__ import annotations
 
 import os
+import hashlib
 import platform
 import re
 import shutil
@@ -362,13 +363,17 @@ def pdf_name(prof: dict) -> str:
     return f"{slugify(prof['contact']['name'], 40).replace('-', '_').title()}_Resume.pdf"
 
 
-def pdf_stamp(prof: dict, resume: dict, style: dict | None = None) -> dict:
+def pdf_stamp(prof: dict, resume: dict, style: dict | None = None, pdf: Path | None = None) -> dict:
     """What a resume PDF was printed from, so a snapshot can tell a current PDF from a stale one."""
     # Older renderers could omit selected skills; their PDFs require a new export.
-    result = {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"], "render_version": 2}
+    result = {"resume_hash": content_hash(resume), "profile_revision": prof["_meta"]["revision"], "render_version": 3}
     settings = style_mod.normalize(style)
     if settings != style_mod.DEFAULT:
         result['style_hash'] = content_hash(settings)
+    if pdf is not None:
+        if not _pdf_complete(pdf):
+            raise ResuError('PDF is incomplete; export it again before recording submission.')
+        result['pdf_sha256'] = hashlib.sha256(pdf.read_bytes()).hexdigest()
     return result
 
 
@@ -535,5 +540,5 @@ def render(job_id: str, want_pdf: bool = False, use_proposal: bool = False, styl
         outputs["pdf"] = str(print_pdf(target, pdf))
         stamp_path(pdf).unlink(missing_ok=True)
         if not use_proposal:
-            store.write_json(stamp_path(pdf), pdf_stamp(prof, resume, settings))
+            store.write_json(stamp_path(pdf), pdf_stamp(prof, resume, settings, pdf))
     return outputs

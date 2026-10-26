@@ -5,7 +5,7 @@ from unittest import mock
 
 from helpers import IsolatedHome, fixture
 
-from resuskill_core import package, profile, questions, render, store, track
+from resuskill_core import jobs, package, profile, questions, render, store, track
 from resuskill_core.util import ResuError
 
 
@@ -218,7 +218,7 @@ class SnapshotPdfTests(IsolatedHome):
     answer_all = PackageFlowTests.answer_all
 
     def fake_pdf(self, html_path, pdf_path):
-        pdf_path.write_bytes(b"%PDF-1.4 " + html_path.read_bytes()[:64])
+        pdf_path.write_bytes(b"%PDF-1.4 " + html_path.read_bytes()[:64] + b"\n%%EOF\n")
         return pdf_path
 
     def test_snapshot_freezes_only_a_current_pdf(self):
@@ -231,6 +231,47 @@ class SnapshotPdfTests(IsolatedHome):
         folder = store.job_dir(self.job_id) / "snapshots" / job["tracking"]["snapshot"]
         self.assertEqual(store.read_json(folder / "package.json")["pdf"], render.pdf_name(profile.load()))
         self.assertTrue((folder / render.pdf_name(profile.load())).exists())
+
+    def test_replaced_truncated_and_legacy_pdfs_are_not_frozen(self):
+        self.prepare()
+        self.answer_all()
+        package.approve(self.job_id)
+        for index, changed in enumerate((b'%PDF-1.4\nDifferent resume\n%%EOF\n', b'%PDF-1.4\ntruncated', None)):
+            with self.subTest(changed=changed):
+                with mock.patch.object(render, 'print_pdf', side_effect=self.fake_pdf):
+                    output = render.render(self.job_id, want_pdf=True)
+                pdf = Path(output['pdf'])
+                if changed is None:
+                    record = store.read_json(render.stamp_path(pdf))
+                    record.pop('pdf_sha256')
+                    store.write_json(render.stamp_path(pdf), record)
+                else:
+                    pdf.write_bytes(changed)
+                # Use a unique snapshot name without changing the application status.
+                with mock.patch.object(track, 'stamp', return_value='snapshot-' + str(index)):
+                    name = track.snapshot(self.job_id)
+                folder = store.job_dir(self.job_id) / 'snapshots' / name
+                frozen = store.read_json(folder / 'package.json')
+                self.assertIsNone(frozen['pdf'])
+                self.assertIn('not frozen', frozen['pdf_note'])
+                self.assertFalse((folder / pdf.name).exists())
+
+    def test_pdf_changed_during_copy_cannot_record_submission(self):
+        self.prepare()
+        self.answer_all()
+        with mock.patch.object(render, 'print_pdf', side_effect=self.fake_pdf):
+            render.render(self.job_id, want_pdf=True)
+        package.approve(self.job_id)
+        real_copy = track.shutil.copy2
+        def changed(source, destination):
+            result = real_copy(source, destination)
+            if str(source).endswith('.pdf'):
+                Path(destination).write_bytes(b'%PDF-1.4\nOther content\n%%EOF\n')
+            return result
+        with mock.patch.object(track.shutil, 'copy2', side_effect=changed), self.assertRaises(ResuError):
+            track.set_status(self.job_id, 'applied')
+        self.assertEqual(jobs.load(self.job_id)['tracking']['status'], 'saved')
+        self.assertEqual(list((store.job_dir(self.job_id) / 'snapshots').iterdir()), [])
 
     def test_snapshot_skips_a_pdf_printed_from_older_content(self):
         self.prepare()
