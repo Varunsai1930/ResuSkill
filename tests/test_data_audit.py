@@ -8,7 +8,7 @@ from pathlib import Path
 
 from helpers import IsolatedHome
 
-from resuskill_core import checklist, cli, jobs, profile, store, track
+from resuskill_core import checklist, cli, history, jobs, pipeline, profile, store, track
 from resuskill_core.util import ResuError
 
 
@@ -112,6 +112,28 @@ class AvailabilityTests(IsolatedHome):
 
 
 class StoredJsonTests(IsolatedHome):
+    def test_missing_and_null_job_files_remain_visible_in_reports(self):
+        healthy = jobs.add('Healthy', 'Engineer', 'Description')
+        missing = jobs.add('Missing', 'Engineer', 'Description')
+        path = store.job_dir(missing['id']) / 'job.json'
+        for null in (False, True):
+            if null:
+                path.write_text('null', encoding='utf-8')
+            else:
+                path.unlink()
+            with self.subTest(null=null):
+                problems = []
+                self.assertEqual([j['id'] for j in jobs.list_jobs(problems)], [healthy['id']])
+                self.assertEqual(problems[0][0], missing['id'])
+                self.assertIn('job.json', problems[0][1])
+                rows = {r['id']: r for r in track.rows()}
+                self.assertEqual(rows[missing['id']]['review'], 'unreadable')
+                self.assertEqual(len(pipeline.report()['jobs']), 2)
+                self.assertIn(missing['id'], [e['id'] for e in history.report()['errors']])
+                self.assertEqual(path.exists(), null)
+                if null:
+                    self.assertEqual(path.read_text(encoding='utf-8'), 'null')
+
     def test_malformed_tracking_history_keeps_healthy_jobs_visible_without_writes(self):
         healthy = jobs.add('Healthy', 'Engineer', 'Description')
         damaged = jobs.add('Damaged', 'Engineer', 'Description')

@@ -54,9 +54,13 @@ def identity(row):
     return ['url', row['source_url']]
 
 
-def inventory():
+def inventory(recoverable_empty_ids=()):
     problems = []
     saved = jobs.list_jobs(problems)
+    # Only a validated recovery plan may account for its own empty directories.
+    # Unrelated missing records and directories containing other data remain errors.
+    problems = [(jid, error) for jid, error in problems
+                if not (jid in recoverable_empty_ids and not any((store.jobs_dir() / jid).iterdir()))]
     if problems:
         raise ResuError('Repair unreadable jobs before preparing or applying imports.', [f'{j}: {e}' for j, e in problems])
     result = {job['id']: content_hash(job) for job in saved}
@@ -200,7 +204,7 @@ def apply(data, approved, selections, updates=None):
         if expected_after != step['after']:
             raise ResuError('Import recovery content differs from the approved row.')
         journal_ids.add(step['id'])
-    _, current = inventory()
+    _, current = inventory({step['id'] for step in journal['plan'] if step['before'] is None})
     expected = dict(journal['before'])
     for step in journal['plan']:
         jobs._check_stored(step['after'], step['id'])

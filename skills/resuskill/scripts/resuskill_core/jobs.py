@@ -125,7 +125,7 @@ def list_jobs(problems: list[tuple[str, str]] | None = None) -> list[dict]:
         try:
             data = store.read_json(path / "job.json")
             if data is None:
-                continue
+                raise ResuError('Job folder has no valid job.json (missing or null); restore a valid backup.')
             _check_stored(data, path.name)
         except ResuError as exc:
             if problems is not None:

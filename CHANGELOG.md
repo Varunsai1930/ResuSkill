@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Surface job directories with missing/null job files in listings, pipeline and historical errors. Import recovery may reuse only its validated plan’s own empty interrupted directories; unrelated or nonempty damaged directories block imports.
+
 - Validate tracking-history shapes before listing dates. A damaged job remains visible as unreadable beside healthy jobs, and `jobs` returns partial results with exit 1 instead of a traceback.
 
 - Stage resume/review HTML and styling before publication; use atomic file replacement with rollback. Preserve prior exports on partial writes or publication failures, and retain recovery copies if rollback itself fails.

@@ -106,6 +106,34 @@ class ImportTests(IsolatedHome):
         self.assertEqual(len(result['jobs']), 2)
         self.assertEqual(len(jobs.list_jobs()), 2)
 
+    def test_recovery_accepts_only_its_own_empty_interrupted_directory(self):
+        data = self.records()
+        preview = imports.preview(data)
+        real_write = store.write_json
+        def interrupted(path, value):
+            if Path(path).name == 'job.json':
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+                raise OSError('interrupted after creating destination')
+            real_write(path, value)
+        with patch.object(store, 'write_json', side_effect=interrupted), self.assertRaises(OSError):
+            imports.apply(data, preview, [1])
+        missing = next(store.jobs_dir().iterdir())
+        with self.assertRaises(ResuError):
+            imports.preview(data)
+        unrelated = store.jobs_dir() / 'unexplained'
+        unrelated.mkdir()
+        with self.assertRaises(ResuError):
+            imports.apply(data, preview, [1])
+        unrelated.rmdir()
+        extra = missing / 'package.json'
+        extra.write_text('{}', encoding='utf-8')
+        with self.assertRaises(ResuError):
+            imports.apply(data, preview, [1])
+        extra.unlink()
+        result = imports.apply(data, preview, [1])
+        self.assertEqual(result['jobs'], [missing.name])
+        self.assertEqual(len(jobs.list_jobs()), 1)
+
     def test_modified_destination_blocks_resume(self):
         data = self.records()
         preview = imports.preview(data)
